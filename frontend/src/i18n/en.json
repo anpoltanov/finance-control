@@ -1,0 +1,231 @@
+{
+  "app": {
+    "title": "Finance Control"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "transactions": "Transactions",
+    "accounts": "Accounts",
+    "categories": "Categories",
+    "budgets": "Budgets",
+    "planned": "Planned",
+    "reports": "Reports",
+    "import": "Import",
+    "settings": "Settings",
+    "add": "Add",
+    "account": "Account",
+    "logout": "Logout"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "create": "Create",
+    "update": "Update",
+    "edit": "Edit",
+    "delete": "Delete",
+    "del": "Del",
+    "loading": "Loading…",
+    "none": "None",
+    "select": "Select",
+    "yes": "yes",
+    "no": "no",
+    "from": "From",
+    "to": "To",
+    "type": "Type",
+    "amount": "Amount",
+    "date": "Date",
+    "name": "Name",
+    "icon": "Icon",
+    "color": "Color",
+    "notes": "Notes",
+    "account": "Account",
+    "category": "Category",
+    "tag": "Tag",
+    "tags": "Tags",
+    "description": "Description",
+    "noData": "No data",
+    "emptyDash": "—"
+  },
+  "filters": {
+    "title": "My filter",
+    "allTypes": "All types",
+    "allAccounts": "All accounts",
+    "allCategories": "All categories",
+    "allTags": "All tags",
+    "search": "Search",
+    "searchPlaceholder": "Notes, payee, category…",
+    "sort": "Sort",
+    "sortDateDesc": "Date · newest",
+    "sortDateAsc": "Date · oldest",
+    "sortAmountDesc": "Amount · high",
+    "sortAmountAsc": "Amount · low",
+    "amountRange": "Amount",
+    "amountMin": "Min",
+    "amountMax": "Max",
+    "transfers": "Transfers",
+    "hideTransfers": "Hide transfers",
+    "reset": "Reset filters"
+  },
+  "settings": {
+    "title": "Settings",
+    "tabs": {
+      "categories": "Categories & Tags",
+      "import": "Import"
+    }
+  },
+  "txType": {
+    "expense": "Expense",
+    "income": "Income",
+    "transfer": "Transfer"
+  },
+  "priority": {
+    "must": "Must",
+    "need": "Need",
+    "want": "Want",
+    "none": "None"
+  },
+  "repeat": {
+    "once": "Once",
+    "monthly": "Monthly",
+    "yearly": "Yearly"
+  },
+  "period": {
+    "monthly": "Monthly",
+    "yearly": "Yearly"
+  },
+  "dateRange": {
+    "thisWeek": "This week",
+    "thisMonth": "This month",
+    "thisYear": "This year",
+    "week": "Week",
+    "month": "Month",
+    "year": "Year",
+    "custom": "Custom",
+    "prev": "Previous period",
+    "next": "Next period"
+  },
+  "transfer": {
+    "nowhere": "outside wallet",
+    "toNowhere": "Outside wallet",
+    "fromNowhere": "Outside wallet",
+    "outsideWallet": "Outside wallet",
+    "fromAccount": "From account",
+    "toAccount": "To account",
+    "bothOutside": "Choose a real account on at least one side."
+  },
+  "confirm": {
+    "delete": "Delete {{label}}? This cannot be undone.",
+    "deleteThis": "Delete this record? This cannot be undone.",
+    "category": "category \"{{name}}\"",
+    "tag": "tag \"{{name}}\"",
+    "transaction": "this transaction",
+    "planned": "this planned transaction"
+  },
+  "theme": {
+    "switchToDark": "Switch to dark theme",
+    "switchToLight": "Switch to light theme"
+  },
+  "login": {
+    "username": "Username",
+    "password": "Password",
+    "signIn": "Sign in",
+    "failed": "Login failed"
+  },
+  "dashboard": {
+    "totalBalance": "Total balance"
+  },
+  "accounts": {
+    "title": "Accounts",
+    "add": "Add account",
+    "back": "← Accounts",
+    "loading": "Loading account…",
+    "new": "New account",
+    "edit": "Edit account",
+    "titleField": "Title",
+    "currency": "Currency",
+    "initialBalance": "Initial balance"
+  },
+  "transactions": {
+    "title": "Transactions",
+    "add": "Add transaction",
+    "new": "New transaction",
+    "edit": "Edit transaction",
+    "empty": "No transactions",
+    "recipient": "Recipient",
+    "noTagsYet": "No tags yet"
+  },
+  "categoriesPage": {
+    "title": "Categories & Tags",
+    "addTag": "Add tag",
+    "addCategory": "Add category",
+    "categories": "Categories",
+    "tags": "Tags",
+    "noCategories": "No categories yet",
+    "noTags": "No tags yet",
+    "newCategory": "New category",
+    "editCategory": "Edit category",
+    "parentCategory": "Parent category",
+    "topLevel": "None (top level)",
+    "priority": "Priority",
+    "newTag": "New tag",
+    "editTag": "Edit tag"
+  },
+  "budgets": {
+    "title": "Budgets",
+    "add": "Add budget",
+    "new": "New budget",
+    "edit": "Edit budget",
+    "startDate": "Start date",
+    "period": "Period",
+    "rollover": "Rollover unused",
+    "categoriesHint": "Categories (empty = all expense)",
+    "remaining": "Remaining: {{amount}}",
+    "rolloverBadge": "rollover"
+  },
+  "planned": {
+    "title": "Planned transactions",
+    "subtitle": "Autocommit runs via background scheduler when enabled.",
+    "add": "Add planned",
+    "new": "New planned transaction",
+    "edit": "Edit planned transaction",
+    "nextDate": "Next date",
+    "repeat": "Repeat",
+    "autocommit": "Autocommit",
+    "commitNow": "Commit now"
+  },
+  "reports": {
+    "title": "Reports",
+    "sync": "Sync to offline cache",
+    "syncedAt": "Synced at {{time}}",
+    "income": "Income",
+    "expense": "Expense",
+    "byCategory": "By category",
+    "monthlyTrends": "Monthly trends"
+  },
+  "import": {
+    "title": "Import from WalletApp",
+    "hint": "Export all transactions as CSV from WalletApp and upload here.",
+    "preview": "Preview",
+    "confirm": "Confirm import",
+    "previewFailed": "Preview failed",
+    "importFailed": "Import failed",
+    "result": "Imported: {{created}} created, {{skipped}} skipped",
+    "newSummary": "New: {{accounts}} accounts, {{categories}} categories, {{tags}} tags · {{regular}} regular transactions",
+    "tabs": {
+      "paired": "paired",
+      "to_nowhere": "to nowhere",
+      "from_nowhere": "from nowhere",
+      "ambiguous": "ambiguous",
+      "regular": "regular"
+    },
+    "table": {
+      "from": "From",
+      "to": "To",
+      "confidence": "Confidence"
+    },
+    "ambiguousHint": "Outflow row #{{index}} — choose partner or mark as to-nowhere:",
+    "autoSkip": "Auto (skip)",
+    "pairWith": "Pair with row #{{index}}",
+    "regularHint": "{{count}} expense/income transactions will be imported."
+  }
+}

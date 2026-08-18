@@ -1,0 +1,1 @@
+{"name":"Finance Control","short_name":"Finance","description":"Personal finance tracker","start_url":"/","display":"standalone","background_color":"#f4f6fb","theme_color":"#4f46e5","lang":"en","scope":"/static/","icons":[{"src":"/favicon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]}

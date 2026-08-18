@@ -1,0 +1,231 @@
+{
+  "app": {
+    "title": "Учёт финансов"
+  },
+  "nav": {
+    "dashboard": "Обзор",
+    "transactions": "Операции",
+    "accounts": "Счета",
+    "categories": "Категории",
+    "budgets": "Бюджеты",
+    "planned": "Плановые",
+    "reports": "Отчёты",
+    "import": "Импорт",
+    "settings": "Настройки",
+    "add": "Добавить",
+    "account": "Аккаунт",
+    "logout": "Выйти"
+  },
+  "common": {
+    "save": "Сохранить",
+    "cancel": "Отмена",
+    "create": "Создать",
+    "update": "Обновить",
+    "edit": "Изменить",
+    "delete": "Удалить",
+    "del": "Уд.",
+    "loading": "Загрузка…",
+    "none": "Нет",
+    "select": "Выберите",
+    "yes": "да",
+    "no": "нет",
+    "from": "С",
+    "to": "По",
+    "type": "Тип",
+    "amount": "Сумма",
+    "date": "Дата",
+    "name": "Название",
+    "icon": "Иконка",
+    "color": "Цвет",
+    "notes": "Заметки",
+    "account": "Счёт",
+    "category": "Категория",
+    "tag": "Тег",
+    "tags": "Теги",
+    "description": "Описание",
+    "noData": "Нет данных",
+    "emptyDash": "—"
+  },
+  "filters": {
+    "title": "Мой фильтр",
+    "allTypes": "Все типы",
+    "allAccounts": "Все счета",
+    "allCategories": "Все категории",
+    "allTags": "Все теги",
+    "search": "Поиск",
+    "searchPlaceholder": "Заметки, получатель, категория…",
+    "sort": "Сортировка",
+    "sortDateDesc": "Дата · новые",
+    "sortDateAsc": "Дата · старые",
+    "sortAmountDesc": "Сумма · больше",
+    "sortAmountAsc": "Сумма · меньше",
+    "amountRange": "Сумма",
+    "amountMin": "От",
+    "amountMax": "До",
+    "transfers": "Переводы",
+    "hideTransfers": "Скрыть переводы",
+    "reset": "Сбросить фильтр"
+  },
+  "settings": {
+    "title": "Настройки",
+    "tabs": {
+      "categories": "Категории и теги",
+      "import": "Импорт"
+    }
+  },
+  "txType": {
+    "expense": "Расход",
+    "income": "Доход",
+    "transfer": "Перевод"
+  },
+  "priority": {
+    "must": "Обязательно",
+    "need": "Нужно",
+    "want": "Хочу",
+    "none": "Нет"
+  },
+  "repeat": {
+    "once": "Один раз",
+    "monthly": "Ежемесячно",
+    "yearly": "Ежегодно"
+  },
+  "period": {
+    "monthly": "Ежемесячно",
+    "yearly": "Ежегодно"
+  },
+  "dateRange": {
+    "thisWeek": "На этой неделе",
+    "thisMonth": "В этом месяце",
+    "thisYear": "В этом году",
+    "week": "Неделя",
+    "month": "Месяц",
+    "year": "Год",
+    "custom": "Свой период",
+    "prev": "Предыдущий период",
+    "next": "Следующий период"
+  },
+  "transfer": {
+    "nowhere": "вне кошелька",
+    "toNowhere": "Вне кошелька",
+    "fromNowhere": "Вне кошелька",
+    "outsideWallet": "Вне кошелька",
+    "fromAccount": "Со счёта",
+    "toAccount": "На счёт",
+    "bothOutside": "Выберите реальный счёт хотя бы с одной стороны."
+  },
+  "confirm": {
+    "delete": "Удалить {{label}}? Это нельзя отменить.",
+    "deleteThis": "Удалить эту запись? Это нельзя отменить.",
+    "category": "категорию «{{name}}»",
+    "tag": "тег «{{name}}»",
+    "transaction": "эту операцию",
+    "planned": "эту запланированную операцию"
+  },
+  "theme": {
+    "switchToDark": "Тёмная тема",
+    "switchToLight": "Светлая тема"
+  },
+  "login": {
+    "username": "Имя пользователя",
+    "password": "Пароль",
+    "signIn": "Войти",
+    "failed": "Ошибка входа"
+  },
+  "dashboard": {
+    "totalBalance": "Общий баланс"
+  },
+  "accounts": {
+    "title": "Счета",
+    "add": "Добавить счёт",
+    "back": "← Счета",
+    "loading": "Загрузка счёта…",
+    "new": "Новый счёт",
+    "edit": "Изменить счёт",
+    "titleField": "Название",
+    "currency": "Валюта",
+    "initialBalance": "Начальный баланс"
+  },
+  "transactions": {
+    "title": "Операции",
+    "add": "Добавить операцию",
+    "new": "Новая операция",
+    "edit": "Изменить операцию",
+    "empty": "Нет операций",
+    "recipient": "Получатель",
+    "noTagsYet": "Тегов пока нет"
+  },
+  "categoriesPage": {
+    "title": "Категории и теги",
+    "addTag": "Добавить тег",
+    "addCategory": "Добавить категорию",
+    "categories": "Категории",
+    "tags": "Теги",
+    "noCategories": "Категорий пока нет",
+    "noTags": "Тегов пока нет",
+    "newCategory": "Новая категория",
+    "editCategory": "Изменить категорию",
+    "parentCategory": "Родительская категория",
+    "topLevel": "Нет (верхний уровень)",
+    "priority": "Приоритет",
+    "newTag": "Новый тег",
+    "editTag": "Изменить тег"
+  },
+  "budgets": {
+    "title": "Бюджеты",
+    "add": "Добавить бюджет",
+    "new": "Новый бюджет",
+    "edit": "Изменить бюджет",
+    "startDate": "Дата начала",
+    "period": "Период",
+    "rollover": "Перенос остатка",
+    "categoriesHint": "Категории (пусто = все расходы)",
+    "remaining": "Остаток: {{amount}}",
+    "rolloverBadge": "перенос"
+  },
+  "planned": {
+    "title": "Плановые операции",
+    "subtitle": "Автопроведение выполняется фоновым планировщиком при включении.",
+    "add": "Добавить плановую",
+    "new": "Новая плановая операция",
+    "edit": "Изменить плановую операцию",
+    "nextDate": "Следующая дата",
+    "repeat": "Повтор",
+    "autocommit": "Автопроведение",
+    "commitNow": "Провести сейчас"
+  },
+  "reports": {
+    "title": "Отчёты",
+    "sync": "Синхронизировать в кэш",
+    "syncedAt": "Синхронизировано: {{time}}",
+    "income": "Доходы",
+    "expense": "Расходы",
+    "byCategory": "По категориям",
+    "monthlyTrends": "По месяцам"
+  },
+  "import": {
+    "title": "Импорт из WalletApp",
+    "hint": "Экспортируйте все операции в CSV из WalletApp и загрузите здесь.",
+    "preview": "Предпросмотр",
+    "confirm": "Подтвердить импорт",
+    "previewFailed": "Ошибка предпросмотра",
+    "importFailed": "Ошибка импорта",
+    "result": "Импортировано: {{created}} создано, {{skipped}} пропущено",
+    "newSummary": "Новое: {{accounts}} счетов, {{categories}} категорий, {{tags}} тегов · {{regular}} обычных операций",
+    "tabs": {
+      "paired": "пары",
+      "to_nowhere": "никуда",
+      "from_nowhere": "откуда-то",
+      "ambiguous": "неоднозначные",
+      "regular": "обычные"
+    },
+    "table": {
+      "from": "Откуда",
+      "to": "Куда",
+      "confidence": "Уверенность"
+    },
+    "ambiguousHint": "Строка расхода #{{index}} — выберите пару или «никуда»:",
+    "autoSkip": "Авто (пропустить)",
+    "pairWith": "Связать со строкой #{{index}}",
+    "regularHint": "Будет импортировано {{count}} операций дохода/расхода."
+  }
+}
