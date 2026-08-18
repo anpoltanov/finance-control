@@ -82,11 +82,15 @@ export async function getLastSyncedAt(): Promise<string | undefined> {
 }
 
 export async function flushOutbox(
-  fetchFn: (item: OutboxItem) => Promise<{ id: number } | void>
+  fetchFn: (item: OutboxItem) => Promise<{ id: number } | { drop: true } | void>
 ) {
   const items = await db.outbox.orderBy("createdAt").toArray();
   for (const item of items) {
     const result = await fetchFn(item);
+    if (result && typeof result === "object" && "drop" in result && result.drop) {
+      if (item.id) await db.outbox.delete(item.id);
+      continue;
+    }
     if (item.localId && result && typeof result === "object" && "id" in result && item.entity) {
       const table = entityTable(item.entity);
       const local = await table.get(item.localId);

@@ -2,6 +2,7 @@ from rest_framework import serializers
 
 from apps.budgets.models import Budget
 from apps.ledger.models import Category
+from apps.ledger.serializers import set_many_related_queryset
 
 
 class BudgetSerializer(serializers.ModelSerializer):
@@ -14,8 +15,10 @@ class BudgetSerializer(serializers.ModelSerializer):
         super().__init__(*args, **kwargs)
         request = self.context.get("request")
         user = getattr(request, "user", None)
+        qs = Category.objects.none()
         if user is not None and getattr(user, "is_authenticated", False):
-            self.fields["category_ids"].queryset = Category.objects.filter(user=user)
+            qs = Category.objects.filter(user=user, deleted_at__isnull=True)
+        set_many_related_queryset(self.fields["category_ids"], qs)
 
     class Meta:
         model = Budget

@@ -1,8 +1,11 @@
 from decimal import Decimal
 
+from django.contrib.auth.models import User
 from django.test import TestCase
+from rest_framework.test import APITestCase
 
-from apps.imports.walletapp import parse_walletapp_csv, preview_import
+from apps.imports.walletapp import commit_import, parse_walletapp_csv, preview_import
+from apps.ledger.models import Transaction
 
 
 SAMPLE_CSV = """account;category;currency;amount;ref_currency_amount;type;payment_type;note;date;transfer;payee;labels
@@ -31,3 +34,24 @@ class WalletAppImportTest(TestCase):
         preview = preview_import(rows)
         self.assertEqual(len(preview.to_nowhere), 1)
         self.assertEqual(len(preview.paired_transfers), 0)
+
+    def test_commit_creates_regular_and_transfer(self):
+        user = User.objects.create_user(username="u", password="p")
+        result = commit_import(user, parse_walletapp_csv(SAMPLE_CSV))
+        self.assertEqual(result["created"], 2)
+        self.assertEqual(Transaction.objects.filter(user=user).count(), 2)
+        transfer = Transaction.objects.get(user=user, type=Transaction.TYPE_TRANSFER)
+        self.assertEqual(transfer.transfer_kind, Transaction.TRANSFER_ACCOUNT)
+        self.assertEqual(transfer.account.title, "ВТБ Андрей")
+        self.assertEqual(transfer.to_account.title, "Сбер Андрей")
+
+
+class ImportThenSyncTests(APITestCase):
+    def test_sync_includes_imported_transactions(self):
+        user = User.objects.create_user(username="u", password="p")
+        self.client.force_authenticate(user)
+        commit_import(user, parse_walletapp_csv(SAMPLE_CSV))
+        res = self.client.get("/api/v1/sync/")
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(len(res.data["transactions"]), 2)
+        self.assertGreaterEqual(len(res.data["accounts"]), 2)
