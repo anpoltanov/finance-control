@@ -1,6 +1,6 @@
 import type { Budget, BudgetStatus, ReportSummary } from "../api/client";
 import { db } from "../db";
-import { resolveCategoryColor } from "../utils/categoryTree";
+import { expandCategoryIds, resolveCategoryColor } from "../utils/categoryTree";
 
 function addMonths(date: Date, months: number): Date {
   return new Date(date.getFullYear(), date.getMonth() + months, date.getDate());
@@ -40,13 +40,18 @@ export function periodBounds(budget: Budget, reference = new Date()): { start: D
 async function spentInPeriod(budget: Budget, periodStart: Date, periodEnd: Date): Promise<number> {
   const startMs = periodStart.getTime();
   const endMs = new Date(periodEnd.getFullYear(), periodEnd.getMonth(), periodEnd.getDate(), 23, 59, 59).getTime();
+  const [accounts, categories] = await Promise.all([db.accounts.toArray(), db.categories.toArray()]);
+  const excluded = new Set(accounts.filter((a) => a.exclude_from_statistics).map((a) => a.id));
+  const categorySet =
+    budget.category_ids?.length ? expandCategoryIds(categories, budget.category_ids) : null;
   const txs = await db.transactions
     .filter((tx) => {
       if (tx.type !== "expense") return false;
+      if (excluded.has(tx.account)) return false;
       const t = new Date(tx.date).getTime();
       if (t < startMs || t > endMs) return false;
-      if (budget.category_ids?.length) {
-        return tx.category != null && budget.category_ids.includes(tx.category);
+      if (categorySet) {
+        return tx.category != null && categorySet.has(tx.category);
       }
       return true;
     })
@@ -94,7 +99,10 @@ export async function listBudgetsWithStatus(): Promise<Budget[]> {
 }
 
 export async function computeReportSummary(from?: string, to?: string): Promise<ReportSummary> {
+  const accounts = await db.accounts.toArray();
+  const excluded = new Set(accounts.filter((a) => a.exclude_from_statistics).map((a) => a.id));
   let txs = await db.transactions.toArray();
+  txs = txs.filter((tx) => !excluded.has(tx.account));
   if (from) {
     const fromMs = new Date(from).getTime();
     txs = txs.filter((tx) => new Date(tx.date).getTime() >= fromMs);

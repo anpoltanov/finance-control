@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { Budget } from "../api/client";
 import { listCategories } from "../data/queries";
 import { createBudget, updateBudget } from "../data/repository";
+import CategoryTreePicker from "./CategoryTreePicker";
 import ModalForm from "./ModalForm";
 
 interface BudgetFormModalProps {
@@ -99,20 +100,12 @@ export default function BudgetFormModal({ open, onClose, onSaved, budget }: Budg
         </div>
         <div className="form-group form-group-full">
           <label>{t("budgets.categoriesHint")}</label>
-          <select
-            multiple
-            value={form.category_ids.map(String)}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                category_ids: Array.from(e.target.selectedOptions).map((o) => Number(o.value)),
-              })
-            }
-          >
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
+          <CategoryTreePicker
+            categories={categories}
+            mode="multi"
+            selectedIds={form.category_ids}
+            onChange={(category_ids) => setForm({ ...form, category_ids })}
+          />
         </div>
       </div>
     </ModalForm>

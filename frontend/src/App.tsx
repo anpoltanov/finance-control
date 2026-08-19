@@ -6,7 +6,6 @@ import { useOfflineSync } from "./hooks/useOfflineSync";
 import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import TransactionsPage from "./pages/TransactionsPage";
-import AccountsPage from "./pages/AccountsPage";
 import AccountDetailPage from "./pages/AccountDetailPage";
 import SettingsPage from "./pages/SettingsPage";
 import BudgetsPage from "./pages/BudgetsPage";
@@ -41,7 +40,7 @@ export default function App() {
         >
           <Route index element={<DashboardPage />} />
           <Route path="transactions" element={<TransactionsPage />} />
-          <Route path="accounts" element={<AccountsPage />} />
+          <Route path="accounts" element={<Navigate to="/settings?tab=accounts" replace />} />
           <Route path="accounts/:accountId" element={<AccountDetailPage />} />
           <Route path="budgets" element={<BudgetsPage />} />
           <Route path="planned" element={<PlannedPage />} />

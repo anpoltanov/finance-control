@@ -44,7 +44,10 @@
     "tags": "Tags",
     "description": "Description",
     "noData": "No data",
-    "emptyDash": "—"
+    "emptyDash": "—",
+    "hex": "Hex color",
+    "chooseIcon": "Choose icon",
+    "back": "Back"
   },
   "filters": {
     "title": "My filter",
@@ -69,6 +72,7 @@
   "settings": {
     "title": "Settings",
     "tabs": {
+      "accounts": "Accounts",
       "categories": "Categories & Tags",
       "import": "Import"
     }
@@ -102,7 +106,9 @@
     "year": "Year",
     "custom": "Custom",
     "prev": "Previous period",
-    "next": "Next period"
+    "next": "Next period",
+    "jumpTo": "Jump to period",
+    "periodType": "Period type"
   },
   "transfer": {
     "nowhere": "outside wallet",
@@ -119,7 +125,8 @@
     "category": "category \"{{name}}\"",
     "tag": "tag \"{{name}}\"",
     "transaction": "this transaction",
-    "planned": "this planned transaction"
+    "planned": "this planned transaction",
+    "account": "account \"{{name}}\""
   },
   "theme": {
     "switchToDark": "Switch to dark theme",
@@ -132,7 +139,13 @@
     "failed": "Login failed"
   },
   "dashboard": {
-    "totalBalance": "Total balance"
+    "totalBalance": "Total balance",
+    "gauges": "Overview",
+    "periodCashFlow": "Cash flow",
+    "periodExpenses": "Expenses",
+    "balanceDynamics": "Balance dynamics",
+    "cashFlow": "Cash flow",
+    "expensesStructure": "Expense structure"
   },
   "accounts": {
     "title": "Accounts",
@@ -143,7 +156,13 @@
     "edit": "Edit account",
     "titleField": "Title",
     "currency": "Currency",
-    "initialBalance": "Initial balance"
+    "initialBalance": "Initial balance",
+    "empty": "No accounts yet",
+    "archived": "Archived",
+    "excludedBadge": "Hidden from stats",
+    "excludeFromStatistics": "Exclude from statistics",
+    "archivedHint": "Hidden from the dashboard and account pickers. Transactions still count in totals.",
+    "excludeHint": "Still selectable, but omitted from dashboard totals, reports, widgets, and budget spent."
   },
   "transactions": {
     "title": "Transactions",
@@ -168,7 +187,8 @@
     "topLevel": "None (top level)",
     "priority": "Priority",
     "newTag": "New tag",
-    "editTag": "Edit tag"
+    "editTag": "Edit tag",
+    "includesNested": "includes nested categories"
   },
   "budgets": {
     "title": "Budgets",
@@ -178,7 +198,7 @@
     "startDate": "Start date",
     "period": "Period",
     "rollover": "Rollover unused",
-    "categoriesHint": "Categories (empty = all expense)",
+    "categoriesHint": "Categories (empty = all expense). Checking a parent includes nested categories.",
     "remaining": "Remaining: {{amount}}",
     "rolloverBadge": "rollover"
   },

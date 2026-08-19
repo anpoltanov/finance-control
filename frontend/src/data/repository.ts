@@ -24,10 +24,11 @@ export async function createAccount(data: Partial<Account>): Promise<Account> {
   const local: Account = {
     id,
     title: data.title || "",
-    icon: data.icon || "💳",
+    icon: data.icon || "credit_card",
     color: data.color || "#6366f1",
     sort_order: data.sort_order || 0,
     archived: data.archived || false,
+    exclude_from_statistics: data.exclude_from_statistics || false,
     currency_code: data.currency_code || "RUB",
     initial_balance: data.initial_balance || "0",
     balance: data.initial_balance || "0",
@@ -72,7 +73,7 @@ export async function createCategory(data: Partial<Category>): Promise<Category>
   const local: Category = {
     id,
     name: data.name || "",
-    icon: data.icon || "📁",
+    icon: data.icon || "folder",
     color: data.color || "#6366f1",
     type: data.type || "expense",
     parent: data.parent ?? null,

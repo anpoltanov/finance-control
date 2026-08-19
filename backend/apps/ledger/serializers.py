@@ -23,6 +23,7 @@ class AccountSerializer(serializers.ModelSerializer):
             "color",
             "sort_order",
             "archived",
+            "exclude_from_statistics",
             "currency_code",
             "initial_balance",
             "balance",

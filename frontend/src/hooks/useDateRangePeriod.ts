@@ -19,6 +19,8 @@ export interface DateRangePeriod {
   setCustomFrom: (value: string) => void;
   setCustomTo: (value: string) => void;
   isCurrent: boolean;
+  jumpTo: (anchor: Date) => void;
+  anchorDate: Date;
 }
 
 function startOfDay(d: Date): Date {
@@ -172,6 +174,19 @@ export function useDateRangePeriod(initial: PeriodType = "month"): DateRangePeri
     }
   }
 
+  function jumpTo(anchor: Date) {
+    if (periodType === "custom") {
+      const length = bounds
+        ? Math.round((bounds.to.getTime() - bounds.from.getTime()) / 86400000) + 1
+        : 30;
+      const from = startOfDay(anchor);
+      setCustomFrom(toYmd(from));
+      setCustomTo(toYmd(addDays(from, length - 1)));
+      return;
+    }
+    setAnchorDate(startOfDay(anchor));
+  }
+
   return {
     periodType,
     setPeriodType,
@@ -187,5 +202,7 @@ export function useDateRangePeriod(initial: PeriodType = "month"): DateRangePeri
     setCustomFrom,
     setCustomTo,
     isCurrent,
+    jumpTo,
+    anchorDate,
   };
 }

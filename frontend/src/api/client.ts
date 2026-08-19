@@ -110,6 +110,7 @@ export interface Account {
   color: string;
   sort_order: number;
   archived: boolean;
+  exclude_from_statistics: boolean;
   currency_code: string;
   initial_balance: string;
   balance: string;

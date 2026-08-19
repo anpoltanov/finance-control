@@ -44,7 +44,10 @@
     "tags": "Теги",
     "description": "Описание",
     "noData": "Нет данных",
-    "emptyDash": "—"
+    "emptyDash": "—",
+    "hex": "Цвет HEX",
+    "chooseIcon": "Выберите иконку",
+    "back": "Назад"
   },
   "filters": {
     "title": "Мой фильтр",
@@ -69,6 +72,7 @@
   "settings": {
     "title": "Настройки",
     "tabs": {
+      "accounts": "Счета",
       "categories": "Категории и теги",
       "import": "Импорт"
     }
@@ -102,7 +106,9 @@
     "year": "Год",
     "custom": "Свой период",
     "prev": "Предыдущий период",
-    "next": "Следующий период"
+    "next": "Следующий период",
+    "jumpTo": "Перейти к периоду",
+    "periodType": "Тип периода"
   },
   "transfer": {
     "nowhere": "вне кошелька",
@@ -119,7 +125,8 @@
     "category": "категорию «{{name}}»",
     "tag": "тег «{{name}}»",
     "transaction": "эту операцию",
-    "planned": "эту запланированную операцию"
+    "planned": "эту запланированную операцию",
+    "account": "счёт «{{name}}»"
   },
   "theme": {
     "switchToDark": "Тёмная тема",
@@ -132,7 +139,13 @@
     "failed": "Ошибка входа"
   },
   "dashboard": {
-    "totalBalance": "Общий баланс"
+    "totalBalance": "Общий баланс",
+    "gauges": "Обзор",
+    "periodCashFlow": "Денежный поток",
+    "periodExpenses": "Расходы",
+    "balanceDynamics": "Динамика баланса",
+    "cashFlow": "Денежный поток",
+    "expensesStructure": "Структура расходов"
   },
   "accounts": {
     "title": "Счета",
@@ -143,7 +156,13 @@
     "edit": "Изменить счёт",
     "titleField": "Название",
     "currency": "Валюта",
-    "initialBalance": "Начальный баланс"
+    "initialBalance": "Начальный баланс",
+    "empty": "Счетов пока нет",
+    "archived": "В архиве",
+    "excludedBadge": "Вне статистики",
+    "excludeFromStatistics": "Исключить из статистики",
+    "archivedHint": "Скрыт с обзора и из списков счетов. Операции по-прежнему учитываются в итогах.",
+    "excludeHint": "Остаётся в списках, но не входит в итоги обзора, отчёты, виджеты и расход бюджета."
   },
   "transactions": {
     "title": "Операции",
@@ -168,7 +187,8 @@
     "topLevel": "Нет (верхний уровень)",
     "priority": "Приоритет",
     "newTag": "Новый тег",
-    "editTag": "Изменить тег"
+    "editTag": "Изменить тег",
+    "includesNested": "включая вложенные"
   },
   "budgets": {
     "title": "Бюджеты",
@@ -178,7 +198,7 @@
     "startDate": "Дата начала",
     "period": "Период",
     "rollover": "Перенос остатка",
-    "categoriesHint": "Категории (пусто = все расходы)",
+    "categoriesHint": "Категории (пусто = все расходы). Выбор родителя включает вложенные.",
     "remaining": "Остаток: {{amount}}",
     "rolloverBadge": "перенос"
   },

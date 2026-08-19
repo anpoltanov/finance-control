@@ -6,6 +6,8 @@ import {
   categoryOptionLabel,
   filterCategoriesForParentPicker,
 } from "../utils/categoryTree";
+import ColorField from "./ColorField";
+import IconPicker from "./IconPicker";
 import ModalForm from "./ModalForm";
 
 interface CategoryFormModalProps {
@@ -18,7 +20,7 @@ interface CategoryFormModalProps {
 
 const empty = () => ({
   name: "",
-  icon: "📁",
+  icon: "folder",
   color: "#6366f1",
   type: "expense" as "expense" | "income",
   parent: null as number | null,
@@ -82,10 +84,6 @@ export default function CategoryFormModal({
           <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
         </div>
         <div className="form-group">
-          <label>{t("common.icon")}</label>
-          <input value={form.icon} onChange={(e) => setForm({ ...form, icon: e.target.value })} />
-        </div>
-        <div className="form-group">
           <label>{t("common.type")}</label>
           <select
             value={form.type}
@@ -145,9 +143,13 @@ export default function CategoryFormModal({
         {!form.parent && (
           <div className="form-group">
             <label>{t("common.color")}</label>
-            <input type="color" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} />
+            <ColorField value={form.color} onChange={(color) => setForm({ ...form, color })} />
           </div>
         )}
+        <div className="form-group form-group-full">
+          <label>{t("common.icon")}</label>
+          <IconPicker value={form.icon} onChange={(icon) => setForm({ ...form, icon })} />
+        </div>
       </div>
     </ModalForm>
   );

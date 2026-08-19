@@ -121,7 +121,11 @@ class ReportSummaryView(APIView):
 
         date_from = request.query_params.get("from")
         date_to = request.query_params.get("to")
-        txs = Transaction.objects.filter(user=request.user, deleted_at__isnull=True)
+        txs = Transaction.objects.filter(
+            user=request.user,
+            deleted_at__isnull=True,
+            account__exclude_from_statistics=False,
+        )
         if date_from:
             txs = txs.filter(date__gte=date_from)
         if date_to:
