@@ -4,11 +4,10 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { useTranslation } from "react-i18next";
 import type { Account } from "../api/client";
 import AccountFormModal from "../components/AccountFormModal";
-import { deleteAccount } from "../data/repository";
+import AccountPlate from "../components/AccountPlate";
 import { listAccounts } from "../data/queries";
-import { formatCurrency } from "../utils/format";
 
-export default function AccountsPage() {
+export default function AccountsPage({ embedded = false }: { embedded?: boolean }) {
   const { t } = useTranslation();
   const accounts = useLiveQuery(() => listAccounts(), []) ?? [];
   const [modalOpen, setModalOpen] = useState(false);
@@ -18,29 +17,41 @@ export default function AccountsPage() {
   return (
     <div>
       <div className="page-header">
-        <h2>{t("accounts.title")}</h2>
-        <button type="button" onClick={() => { setEditing(null); setModalOpen(true); }}>{t("accounts.add")}</button>
+        {!embedded && <h2>{t("accounts.title")}</h2>}
+        <button
+          type="button"
+          style={embedded ? { marginLeft: "auto" } : undefined}
+          onClick={() => {
+            setEditing(null);
+            setModalOpen(true);
+          }}
+        >
+          {t("accounts.add")}
+        </button>
       </div>
-      <div className="grid">
-        {accounts.map((a) => (
-          <div
-            key={a.id}
-            className="card account-card clickable"
-            style={{ borderLeft: `4px solid ${a.color}` }}
-            role="button"
-            tabIndex={0}
-            onClick={() => navigate(`/accounts/${a.id}`)}
-            onKeyDown={(e) => e.key === "Enter" && navigate(`/accounts/${a.id}`)}
-          >
-            <span style={{ fontSize: "1.5rem" }}>{a.icon}</span> <strong>{a.title}</strong>
-            <p>{formatCurrency(a.balance, a.currency_code)}</p>
-            <div className="card-actions" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
-              <button type="button" className="secondary" onClick={() => { setEditing(a); setModalOpen(true); }}>{t("common.edit")}</button>
-              <button type="button" className="danger" onClick={() => deleteAccount(a.id)}>{t("common.delete")}</button>
-            </div>
-          </div>
+      <div className="account-plate-grid settings-accounts">
+        {accounts.map((account) => (
+          <AccountPlate
+            key={account.id}
+            account={account}
+            compact={false}
+            onClick={() => navigate(`/accounts/${account.id}`)}
+            actions={
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => {
+                  setEditing(account);
+                  setModalOpen(true);
+                }}
+              >
+                {t("common.edit")}
+              </button>
+            }
+          />
         ))}
       </div>
+      {accounts.length === 0 && <p className="muted-text">{t("accounts.empty")}</p>}
       <AccountFormModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}

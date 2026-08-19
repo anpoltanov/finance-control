@@ -43,10 +43,11 @@ class Account(TimestampedModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="accounts")
     household_id = models.UUIDField(null=True, blank=True, db_index=True)
     title = models.CharField(max_length=255)
-    icon = models.CharField(max_length=32, default="💳")
+    icon = models.CharField(max_length=32, default="credit_card")
     color = models.CharField(max_length=7, default="#6366f1")
     sort_order = models.IntegerField(default=0)
     archived = models.BooleanField(default=False)
+    exclude_from_statistics = models.BooleanField(default=False)
     currency_code = models.CharField(max_length=3, default="RUB")
     initial_balance = models.DecimalField(max_digits=18, decimal_places=2, default=Decimal("0"))
 
@@ -99,7 +100,7 @@ class Category(TimestampedModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="categories")
     household_id = models.UUIDField(null=True, blank=True, db_index=True)
     name = models.CharField(max_length=255)
-    icon = models.CharField(max_length=32, default="📁")
+    icon = models.CharField(max_length=32, default="folder")
     color = models.CharField(max_length=7, default="#6366f1")
     type = models.CharField(max_length=10, choices=TYPE_CHOICES, default=TYPE_EXPENSE)
     parent = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="children")
@@ -118,6 +119,26 @@ class Category(TimestampedModel):
 
     def __str__(self):
         return self.name
+
+    @classmethod
+    def ids_with_descendants(cls, user, category_ids):
+        """Return selected category ids plus every nested child (any depth)."""
+        selected = {int(cid) for cid in category_ids}
+        if not selected:
+            return set()
+        rows = cls.objects.filter(user=user, deleted_at__isnull=True).values_list("id", "parent_id")
+        children: dict[int | None, list[int]] = {}
+        for cid, parent_id in rows:
+            children.setdefault(parent_id, []).append(cid)
+        expanded: set[int] = set()
+        stack = list(selected)
+        while stack:
+            cid = stack.pop()
+            if cid in expanded:
+                continue
+            expanded.add(cid)
+            stack.extend(children.get(cid, []))
+        return expanded
 
 
 class Tag(TimestampedModel):

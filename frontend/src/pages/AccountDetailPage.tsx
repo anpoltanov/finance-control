@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useTranslation } from "react-i18next";
 import type { Transaction } from "../api/client";
+import GlyphIcon from "../components/GlyphIcon";
 import TransactionList from "../components/TransactionList";
 import { useAddTransaction } from "../context/AddTransactionContext";
 import { getAccount, listTransactions } from "../data/queries";
@@ -27,9 +28,11 @@ export default function AccountDetailPage() {
     <div>
       <div className="account-detail-header card">
         <div className="account-detail-info">
-          <Link to="/accounts" className="muted-text account-back-link">{t("accounts.back")}</Link>
+          <Link to="/settings?tab=accounts" className="muted-text account-back-link">{t("accounts.back")}</Link>
           <div className="account-detail-title">
-            <span className="account-detail-icon" style={{ borderColor: account.color }}>{account.icon}</span>
+            <span className="account-detail-icon" style={{ borderColor: account.color }}>
+              <GlyphIcon icon={account.icon} fallback="credit_card" />
+            </span>
             <div>
               <h2>{account.title}</h2>
               <p className="account-detail-balance">

@@ -24,6 +24,30 @@ export function buildCategoryTree(categories: Category[]): CategoryTreeNode[] {
   return result;
 }
 
+export function getChildren(categories: Category[], parentId: number | null): Category[] {
+  return categories.filter((c) => c.parent === parentId).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export function getAncestorIds(categories: Category[], categoryId: number): number[] {
+  const byId = new Map(categories.map((c) => [c.id, c]));
+  const ancestors: number[] = [];
+  let current = byId.get(categoryId);
+  while (current?.parent) {
+    ancestors.push(current.parent);
+    current = byId.get(current.parent);
+  }
+  return ancestors;
+}
+
+export function expandCategoryIds(categories: Category[], selectedIds: number[]): Set<number> {
+  const expanded = new Set<number>();
+  for (const id of selectedIds) {
+    expanded.add(id);
+    for (const childId of getDescendantIds(categories, id)) expanded.add(childId);
+  }
+  return expanded;
+}
+
 export function getDescendantIds(categories: Category[], categoryId: number): Set<number> {
   const byParent = new Map<number | null, number[]>();
   for (const category of categories) {

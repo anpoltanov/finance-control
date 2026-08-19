@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { Account, Category, Tag } from "../api/client";
-import { categoryOptionLabel, filterCategoriesForTransaction } from "../utils/categoryTree";
+import { accountsForSelect } from "../data/queries";
+import { filterCategoriesForTransaction } from "../utils/categoryTree";
 import { OUTSIDE, type TransferPicks } from "../utils/transferPicks";
+import CategoryTreePicker from "./CategoryTreePicker";
 
 export type TxFieldType = "expense" | "income" | "transfer";
 
@@ -64,8 +66,8 @@ export default function TransactionFields({
     });
   }
 
-  function accountOptions(excludeId?: string) {
-    return accounts
+  function accountOptions(excludeId?: string, keepId?: number | null) {
+    return accountsForSelect(accounts, [keepId, excludeId ? Number(excludeId) : undefined])
       .filter((a) => String(a.id) !== excludeId)
       .map((a) => (
         <option key={a.id} value={a.id}>{a.title}</option>
@@ -93,7 +95,7 @@ export default function TransactionFields({
             <select value={fromPick} onChange={(e) => onPicksChange({ fromPick: e.target.value })} required>
               <option value="">{t("common.select")}</option>
               <option value={OUTSIDE}>{t("transfer.outsideWallet")}</option>
-              {accountOptions(toPick === OUTSIDE ? undefined : toPick)}
+              {accountOptions(toPick === OUTSIDE ? undefined : toPick, fromPick && fromPick !== OUTSIDE ? Number(fromPick) : undefined)}
             </select>
           </div>
           <div className="form-group">
@@ -101,7 +103,7 @@ export default function TransactionFields({
             <select value={toPick} onChange={(e) => onPicksChange({ toPick: e.target.value })} required>
               <option value="">{t("common.select")}</option>
               <option value={OUTSIDE}>{t("transfer.outsideWallet")}</option>
-              {accountOptions(fromPick === OUTSIDE ? undefined : fromPick)}
+              {accountOptions(fromPick === OUTSIDE ? undefined : fromPick, toPick && toPick !== OUTSIDE ? Number(toPick) : undefined)}
             </select>
           </div>
         </>
@@ -115,26 +117,23 @@ export default function TransactionFields({
             disabled={lockAccount}
           >
             <option value="">{t("common.select")}</option>
-            {accounts.map((a) => (
+            {accountsForSelect(accounts, [values.account]).map((a) => (
               <option key={a.id} value={a.id}>{a.title}</option>
             ))}
           </select>
         </div>
       )}
       {values.type !== "transfer" && (
-        <div className="form-group">
+        <div className="form-group form-group-full">
           <label>{t("common.category")}</label>
-          <select
-            value={values.category || ""}
-            onChange={(e) => onChange({ category: e.target.value ? Number(e.target.value) : null })}
-          >
-            <option value="">{t("common.none")}</option>
-            {filterCategoriesForTransaction(categories, values.type).map((c) => (
-              <option key={c.id} value={c.id}>
-                {categoryOptionLabel(c.name, c.depth)}
-              </option>
-            ))}
-          </select>
+          <CategoryTreePicker
+            categories={filterCategoriesForTransaction(categories, values.type)}
+            mode="single"
+            selectedIds={values.category ? [values.category] : []}
+            onChange={(ids) => onChange({ category: ids[0] ?? null })}
+            allowEmpty
+            emptyLabel={t("common.none")}
+          />
         </div>
       )}
       <div className="form-group">{dateField}</div>

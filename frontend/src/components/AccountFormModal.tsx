@@ -1,7 +1,9 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Account } from "../api/client";
-import { createAccount, updateAccount } from "../data/repository";
+import { createAccount, deleteAccount, updateAccount } from "../data/repository";
+import ColorField from "./ColorField";
+import IconPicker from "./IconPicker";
 import ModalForm from "./ModalForm";
 
 interface AccountFormModalProps {
@@ -13,10 +15,12 @@ interface AccountFormModalProps {
 
 const empty = () => ({
   title: "",
-  icon: "💳",
+  icon: "credit_card",
   color: "#6366f1",
   currency_code: "RUB",
   initial_balance: "0",
+  archived: false,
+  exclude_from_statistics: false,
 });
 
 export default function AccountFormModal({ open, onClose, onSaved, account }: AccountFormModalProps) {
@@ -32,6 +36,8 @@ export default function AccountFormModal({ open, onClose, onSaved, account }: Ac
         color: account.color,
         currency_code: account.currency_code,
         initial_balance: account.initial_balance,
+        archived: account.archived,
+        exclude_from_statistics: Boolean(account.exclude_from_statistics),
       });
     } else {
       setForm(empty());
@@ -56,19 +62,23 @@ export default function AccountFormModal({ open, onClose, onSaved, account }: Ac
       onClose={onClose}
       onSubmit={submit}
       submitLabel={account ? t("common.update") : t("common.create")}
+      onDelete={
+        account?.id
+          ? async () => {
+              await deleteAccount(account.id);
+              onSaved();
+              onClose();
+            }
+          : undefined
+      }
+      deleteConfirmMessage={
+        account ? t("confirm.delete", { label: t("confirm.account", { name: account.title }) }) : undefined
+      }
     >
       <div className="form-grid">
         <div className="form-group">
           <label>{t("accounts.titleField")}</label>
           <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
-        </div>
-        <div className="form-group">
-          <label>{t("common.icon")}</label>
-          <input value={form.icon} onChange={(e) => setForm({ ...form, icon: e.target.value })} />
-        </div>
-        <div className="form-group">
-          <label>{t("common.color")}</label>
-          <input type="color" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} />
         </div>
         <div className="form-group">
           <label>{t("accounts.currency")}</label>
@@ -77,6 +87,34 @@ export default function AccountFormModal({ open, onClose, onSaved, account }: Ac
         <div className="form-group">
           <label>{t("accounts.initialBalance")}</label>
           <input value={form.initial_balance} onChange={(e) => setForm({ ...form, initial_balance: e.target.value })} />
+        </div>
+        <div className="form-group">
+          <label>{t("common.color")}</label>
+          <ColorField value={form.color} onChange={(color) => setForm({ ...form, color })} />
+        </div>
+        <div className="form-group form-group-full">
+          <label>{t("common.icon")}</label>
+          <IconPicker value={form.icon} onChange={(icon) => setForm({ ...form, icon })} />
+        </div>
+        <div className="form-group form-group-full form-checks">
+          <label className="filter-checkbox">
+            <input
+              type="checkbox"
+              checked={form.archived}
+              onChange={(e) => setForm({ ...form, archived: e.target.checked })}
+            />
+            {t("accounts.archived")}
+          </label>
+          <p className="field-hint">{t("accounts.archivedHint")}</p>
+          <label className="filter-checkbox">
+            <input
+              type="checkbox"
+              checked={form.exclude_from_statistics}
+              onChange={(e) => setForm({ ...form, exclude_from_statistics: e.target.checked })}
+            />
+            {t("accounts.excludeFromStatistics")}
+          </label>
+          <p className="field-hint">{t("accounts.excludeHint")}</p>
         </div>
       </div>
     </ModalForm>

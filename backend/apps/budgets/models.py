@@ -7,7 +7,7 @@ from django.db import models
 from django.db.models import Sum
 from django.utils import timezone
 
-from apps.ledger.models import TimestampedModel, Transaction
+from apps.ledger.models import Category, TimestampedModel, Transaction
 
 
 class Budget(TimestampedModel):
@@ -51,9 +51,12 @@ class Budget(TimestampedModel):
             date__date__gte=period_start,
             date__date__lte=period_end,
             deleted_at__isnull=True,
+            account__exclude_from_statistics=False,
         )
-        if self.categories.exists():
-            qs = qs.filter(category__in=self.categories.all())
+        selected_ids = list(self.categories.values_list("id", flat=True))
+        if selected_ids:
+            expanded = Category.ids_with_descendants(self.user, selected_ids)
+            qs = qs.filter(category_id__in=expanded)
         return qs.aggregate(total=Sum("amount"))["total"] or Decimal("0")
 
     def compute_status(self, reference: date | None = None) -> dict:

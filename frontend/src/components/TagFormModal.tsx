@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Tag } from "../api/client";
 import { createTag, updateTag } from "../data/repository";
+import ColorField from "./ColorField";
 import ModalForm from "./ModalForm";
 
 interface TagFormModalProps {
@@ -52,7 +53,7 @@ export default function TagFormModal({ open, onClose, onSaved, tag }: TagFormMod
         </div>
         <div className="form-group">
           <label>{t("common.color")}</label>
-          <input type="color" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} />
+          <ColorField value={form.color} onChange={(color) => setForm({ ...form, color })} />
         </div>
       </div>
     </ModalForm>

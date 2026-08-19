@@ -2,6 +2,7 @@ import type { Transaction } from "../api/client";
 import { useTranslation } from "react-i18next";
 import { formatDate, formatSignedCurrency } from "../utils/format";
 import { formatSignedAmount, transferRoute } from "../utils/transactionDisplay";
+import GlyphIcon from "./GlyphIcon";
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -116,7 +117,11 @@ export default function TransactionList({
                     style={{ background: tx.category_color || "var(--surface2)" }}
                     aria-hidden="true"
                   >
-                    {tx.category_icon || (tx.type === "transfer" ? "⇄" : "·")}
+                    {tx.category_icon ? (
+                      <GlyphIcon icon={tx.category_icon} />
+                    ) : (
+                      <GlyphIcon icon={tx.type === "transfer" ? "swap_horiz" : "circle"} />
+                    )}
                   </span>
                   <div className="tx-day-main">
                     <div className="tx-day-title">{title}</div>

@@ -5,11 +5,11 @@ import { api } from "../api/client";
 import { useAddTransaction } from "../context/AddTransactionContext";
 import { setLocale, type AppLocale } from "../i18n";
 import { readTheme, setTheme, type ThemeMode } from "../theme";
+import GlyphIcon from "./GlyphIcon";
 
 const navItems = [
   { to: "/", key: "nav.dashboard", end: true },
   { to: "/transactions", key: "nav.transactions" },
-  { to: "/accounts", key: "nav.accounts" },
   { to: "/budgets", key: "nav.budgets" },
   { to: "/planned", key: "nav.planned" },
   { to: "/reports", key: "nav.reports" },
@@ -69,7 +69,7 @@ export default function AppHeader() {
           </NavLink>
         ))}
         <NavLink to="/settings" className={({ isActive }) => (isActive ? "active settings-link" : "settings-link")} title={t("nav.settings")}>
-          <span aria-hidden="true">⚙</span>
+          <GlyphIcon icon="settings" />
           <span className="settings-link-label">{t("nav.settings")}</span>
         </NavLink>
       </nav>
@@ -89,7 +89,9 @@ export default function AppHeader() {
           title={t(theme === "dark" ? "theme.switchToLight" : "theme.switchToDark")}
           aria-label={t(theme === "dark" ? "theme.switchToLight" : "theme.switchToDark")}
         >
-          <span aria-hidden="true">{theme === "dark" ? "☀" : "☾"}</span>
+          <span aria-hidden="true">
+            <GlyphIcon icon={theme === "dark" ? "light_mode" : "dark_mode"} />
+          </span>
         </button>
         <button type="button" className="header-add-btn" onClick={() => openAddTransaction()}>
           + {t("nav.add")}

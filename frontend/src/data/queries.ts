@@ -31,6 +31,16 @@ export async function listAccounts(): Promise<Account[]> {
   return withBalances.sort((a, b) => a.sort_order - b.sort_order || a.title.localeCompare(b.title));
 }
 
+export function accountsForSelect(
+  accounts: Account[],
+  keepIds: Array<number | null | undefined> = []
+): Account[] {
+  const keep = new Set(
+    keepIds.filter((id): id is number => typeof id === "number" && Number.isFinite(id))
+  );
+  return accounts.filter((account) => !account.archived || keep.has(account.id));
+}
+
 export async function getAccount(id: number): Promise<Account | undefined> {
   const account = await db.accounts.get(id);
   if (!account) return undefined;
