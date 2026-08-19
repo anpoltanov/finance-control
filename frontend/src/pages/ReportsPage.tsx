@@ -7,7 +7,7 @@ import DateRangeNav from "../components/DateRangeNav";
 import { computeReportSummary } from "../data/reports";
 import { runSync } from "../hooks/useOfflineSync";
 import { useDateRangePeriod } from "../hooks/useDateRangePeriod";
-import { formatCurrency } from "../utils/format";
+import { formatCurrency, chartNumericValue } from "../utils/format";
 
 ChartJS.register(ArcElement, CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
@@ -25,17 +25,6 @@ export default function ReportsPage() {
     await runSync();
     setSyncStatus(t("reports.syncedAt", { time: new Date().toISOString() }));
   }
-
-  const currencyTooltip = {
-    callbacks: {
-      label: (ctx: { dataset?: { label?: string }; label?: string; parsed: number | { y?: number } | null }) => {
-        const parsed = ctx.parsed;
-        const value = typeof parsed === "number" ? parsed : parsed?.y ?? 0;
-        const name = ctx.dataset?.label || ctx.label || "";
-        return `${name ? `${name}: ` : ""}${formatCurrency(value)}`;
-      },
-    },
-  };
 
   const categoryData = report
     ? {
@@ -97,7 +86,16 @@ export default function ReportsPage() {
                 <Doughnut
                   data={categoryData}
                   options={{
-                    plugins: { tooltip: currencyTooltip },
+                    plugins: {
+                      tooltip: {
+                        callbacks: {
+                          label: (ctx) => {
+                            const name = ctx.label ? `${ctx.label}: ` : "";
+                            return `${name}${formatCurrency(chartNumericValue(ctx.parsed))}`;
+                          },
+                        },
+                      },
+                    },
                   }}
                 />
               ) : (
@@ -111,7 +109,16 @@ export default function ReportsPage() {
                   data={barData}
                   options={{
                     responsive: true,
-                    plugins: { tooltip: currencyTooltip },
+                    plugins: {
+                      tooltip: {
+                        callbacks: {
+                          label: (ctx) => {
+                            const name = ctx.dataset.label ? `${ctx.dataset.label}: ` : "";
+                            return `${name}${formatCurrency(chartNumericValue(ctx.parsed))}`;
+                          },
+                        },
+                      },
+                    },
                     scales: {
                       y: {
                         ticks: { callback: (value) => formatCurrency(Number(value)) },

@@ -15,7 +15,7 @@ import {
 import { Doughnut, Line } from "react-chartjs-2";
 import { useTranslation } from "react-i18next";
 import { expenseSlices, pctChange, type DashboardSnapshot } from "../../data/dashboard";
-import { formatCurrency } from "../../utils/format";
+import { formatCurrency, chartNumericValue } from "../../utils/format";
 import GlyphIcon from "../GlyphIcon";
 import SemiGauge, { PctBadge, trendColor } from "./SemiGauge";
 
@@ -47,16 +47,6 @@ export default function DashboardWidgets({ data }: DashboardWidgetsProps) {
   const balancePct = pctChange(data.currentBalance, data.previousBalance);
   const cashFlowPct = pctChange(data.period.net, data.previousPeriod.net);
   const expensePct = pctChange(data.period.expense, data.previousPeriod.expense);
-  const currencyTooltip = {
-    callbacks: {
-      label: (ctx: { label?: string; parsed: number | { y?: number } | null }) => {
-        const parsed = ctx.parsed;
-        const value = typeof parsed === "number" ? parsed : parsed?.y ?? 0;
-        const name = ctx.label ? `${ctx.label}: ` : "";
-        return `${name}${formatCurrency(value, currency)}`;
-      },
-    },
-  };
 
   function onSliceClick(_event: ChartEvent, elements: ActiveElement[]) {
     const index = elements[0]?.index;
@@ -126,7 +116,14 @@ export default function DashboardWidgets({ data }: DashboardWidgetsProps) {
             options={{
               responsive: true,
               maintainAspectRatio: false,
-              plugins: { legend: { display: false }, tooltip: currencyTooltip },
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  callbacks: {
+                    label: (ctx) => formatCurrency(chartNumericValue(ctx.parsed), currency),
+                  },
+                },
+              },
               scales: {
                 x: { grid: { display: false } },
                 y: {
@@ -206,7 +203,14 @@ export default function DashboardWidgets({ data }: DashboardWidgetsProps) {
                       if (slice?.hasChildren && !slice.direct) setDrill((path) => [...path, slice.id]);
                     },
                   },
-                  tooltip: currencyTooltip,
+                  tooltip: {
+                    callbacks: {
+                      label: (ctx) => {
+                        const name = ctx.label ? `${ctx.label}: ` : "";
+                        return `${name}${formatCurrency(chartNumericValue(ctx.parsed), currency)}`;
+                      },
+                    },
+                  },
                 },
               }}
             />

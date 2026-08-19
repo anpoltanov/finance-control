@@ -27,6 +27,15 @@ export function formatCurrency(value: number | string, currencyCode = "RUB"): st
   }
 }
 
+export function chartNumericValue(parsed: unknown): number {
+  if (typeof parsed === "number") return parsed;
+  if (parsed && typeof parsed === "object" && "y" in parsed) {
+    const y = (parsed as { y?: number | null }).y;
+    return typeof y === "number" ? y : 0;
+  }
+  return 0;
+}
+
 export function formatSignedCurrency(
   value: number | string,
   currencyCode = "RUB",
