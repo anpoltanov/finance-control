@@ -126,7 +126,7 @@ def parse_walletapp_csv(content: str) -> list[WalletAppRow]:
     return rows
 
 
-def preview_import(rows: list[WalletAppRow], resolutions: dict | None = None) -> ImportPreview:
+def preview_import(rows: list[WalletAppRow], resolutions: dict | None = None, user=None) -> ImportPreview:
     resolutions = {str(k): str(v) for k, v in (resolutions or {}).items() if v not in (None, "")}
     regular = [row for row in rows if not row.transfer]
     outflows = [row for row in rows if row.transfer and row.type == Transaction.TYPE_EXPENSE]
@@ -178,15 +178,33 @@ def preview_import(rows: list[WalletAppRow], resolutions: dict | None = None) ->
     for row in rows:
         tags.update(row.labels)
 
+    if user is None:
+        new_accounts = sorted(accounts)
+        new_categories = sorted(categories)
+        new_tags = sorted(tags)
+    else:
+        existing_accounts = {
+            title.lower()
+            for title in Account.objects.filter(user=user, deleted_at__isnull=True).values_list("title", flat=True)
+        }
+        existing_tags = {
+            name.lower()
+            for name in Tag.objects.filter(user=user, deleted_at__isnull=True).values_list("name", flat=True)
+        }
+        existing_cats = list(Category.objects.filter(user=user, deleted_at__isnull=True).only("id", "name", "parent_id"))
+        new_accounts = sorted(name for name in accounts if name.lower() not in existing_accounts)
+        new_categories = sorted(name for name in categories if not _category_name_exists(existing_cats, name))
+        new_tags = sorted(name for name in tags if name.lower() not in existing_tags)
+
     return ImportPreview(
         regular=regular,
         paired_transfers=paired,
         to_nowhere=to_nowhere,
         from_nowhere=from_nowhere,
         ambiguous=ambiguous,
-        new_accounts=sorted(accounts),
-        new_categories=sorted(categories),
-        new_tags=sorted(tags),
+        new_accounts=new_accounts,
+        new_categories=new_categories,
+        new_tags=new_tags,
     )
 
 
@@ -231,7 +249,51 @@ def preview_to_dict(preview: ImportPreview) -> dict:
     }
 
 
+def _split_category_path(name: str) -> list[str]:
+    text = (name or "").strip()
+    if not text:
+        return []
+    if " / " in text:
+        return [part.strip() for part in text.split(" / ") if part.strip()]
+    if ":" in text:
+        return [part.strip() for part in text.split(":") if part.strip()]
+    return [text]
+
+
+def _category_name_exists(categories: list[Category], name: str) -> bool:
+    parts = _split_category_path(name)
+    if not parts:
+        return False
+    if len(parts) == 1:
+        needle = parts[0].lower()
+        return any(category.name.lower() == needle for category in categories)
+    by_parent: dict[int | None, list[Category]] = {}
+    for category in categories:
+        by_parent.setdefault(category.parent_id, []).append(category)
+    parent_id = None
+    for part in parts:
+        needle = part.lower()
+        match = next((category for category in by_parent.get(parent_id, []) if category.name.lower() == needle), None)
+        if match is None:
+            return False
+        parent_id = match.id
+    return True
+
+
+def _find_category(user, name: str, category_type: str) -> Category | None:
+    qs = Category.objects.filter(user=user, deleted_at__isnull=True, name__iexact=name)
+    typed = qs.filter(type=category_type)
+    if typed.count() == 1:
+        return typed.first()
+    if qs.count() == 1:
+        return qs.first()
+    return None
+
+
 def _get_or_create_account(user, title: str, currency: str) -> Account:
+    existing = Account.objects.filter(user=user, deleted_at__isnull=True, title__iexact=title).first()
+    if existing:
+        return existing
     account, _ = Account.objects.get_or_create(
         user=user,
         title=title,
@@ -241,22 +303,44 @@ def _get_or_create_account(user, title: str, currency: str) -> Account:
 
 
 def _get_or_create_category(user, name: str, tx_type: str) -> Category | None:
-    if not name:
+    parts = _split_category_path(name)
+    if not parts:
         return None
     category_type = Category.TYPE_INCOME if tx_type == Transaction.TYPE_INCOME else Category.TYPE_EXPENSE
-    category, _ = Category.objects.get_or_create(
-        user=user,
-        name=name,
-        parent=None,
-        defaults={"type": category_type},
-    )
+    if len(parts) == 1:
+        existing = _find_category(user, parts[0], category_type)
+        if existing:
+            return existing
+        category, _ = Category.objects.get_or_create(
+            user=user,
+            name=parts[0],
+            parent=None,
+            defaults={"type": category_type},
+        )
+        return category
+
+    parent = None
+    category = None
+    for part in parts:
+        found = Category.objects.filter(
+            user=user,
+            deleted_at__isnull=True,
+            name__iexact=part,
+            parent=parent,
+        ).first()
+        if found is None:
+            found = Category.objects.create(user=user, name=part, parent=parent, type=category_type)
+        category = found
+        parent = found
     return category
 
 
 def _get_tags(user, labels: list[str]) -> list[Tag]:
     tags = []
     for name in labels:
-        tag, _ = Tag.objects.get_or_create(user=user, name=name)
+        tag = Tag.objects.filter(user=user, deleted_at__isnull=True, name__iexact=name).first()
+        if tag is None:
+            tag, _ = Tag.objects.get_or_create(user=user, name=name)
         tags.append(tag)
     return tags
 

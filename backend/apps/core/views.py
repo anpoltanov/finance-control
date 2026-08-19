@@ -116,8 +116,9 @@ class SyncView(APIView):
 
 class ReportSummaryView(APIView):
     def get(self, request):
-        from django.db.models import Sum
-        from django.db.models.functions import TruncMonth
+        from collections import defaultdict
+
+        from apps.ledger.stats import classify_cash_flow
 
         date_from = request.query_params.get("from")
         date_to = request.query_params.get("to")
@@ -125,28 +126,13 @@ class ReportSummaryView(APIView):
             user=request.user,
             deleted_at__isnull=True,
             account__exclude_from_statistics=False,
-        )
+        ).select_related("category")
         if date_from:
             txs = txs.filter(date__gte=date_from)
         if date_to:
             txs = txs.filter(date__lte=date_to)
 
-        by_category = (
-            txs.filter(type="expense", category__isnull=False)
-            .values("category__name", "category__id", "category__color", "category__parent_id")
-            .annotate(total=Sum("amount"))
-            .order_by("-total")
-        )
-        income = txs.filter(type="income").aggregate(total=Sum("amount"))["total"] or 0
-        expense = txs.filter(type="expense").aggregate(total=Sum("amount"))["total"] or 0
-        monthly = (
-            txs.filter(type__in=["expense", "income"])
-            .annotate(month=TruncMonth("date"))
-            .values("month", "type")
-            .annotate(total=Sum("amount"))
-            .order_by("month")
-        )
-        cats = {c.id: c for c in Category.objects.filter(user=request.user).only("id", "parent_id", "color")}
+        cats = {c.id: c for c in Category.objects.filter(user=request.user).only("id", "parent_id", "color", "name", "type")}
 
         def root_color(cat_id):
             cat = cats.get(cat_id)
@@ -154,22 +140,45 @@ class ReportSummaryView(APIView):
                 cat = cats.get(cat.parent_id)
             return cat.color if cat else "#6366f1"
 
+        income = 0
+        expense = 0
+        by_category_map: dict[int, float] = defaultdict(float)
+        monthly_map: dict[tuple[str, str], float] = defaultdict(float)
+
+        for tx in txs:
+            category_type = tx.category.type if tx.category_id else None
+            inc, exp = classify_cash_flow(tx.type, tx.amount, category_type)
+            income += inc
+            expense += exp
+            if tx.category_id and exp != 0 and tx.category and tx.category.type == Category.TYPE_EXPENSE:
+                by_category_map[tx.category_id] += float(exp)
+            if inc != 0 or exp != 0:
+                month_key = tx.date.date().replace(day=1).isoformat()
+                if inc:
+                    monthly_map[(month_key, "income")] += float(inc)
+                if exp:
+                    monthly_map[(month_key, "expense")] += float(exp)
+
+        by_category = [
+            {
+                "category_id": cat_id,
+                "category_name": cats[cat_id].name if cat_id in cats else str(cat_id),
+                "category_color": root_color(cat_id),
+                "total": str(total),
+            }
+            for cat_id, total in sorted(by_category_map.items(), key=lambda item: item[1], reverse=True)
+            if total > 0
+        ]
+        monthly = [
+            {"month": f"{month}T00:00:00", "type": kind, "total": str(total)}
+            for (month, kind), total in sorted(monthly_map.items())
+        ]
+
         return Response(
             {
                 "income_total": str(income),
                 "expense_total": str(expense),
-                "by_category": [
-                    {
-                        "category_id": r["category__id"],
-                        "category_name": r["category__name"],
-                        "category_color": root_color(r["category__id"]),
-                        "total": str(r["total"]),
-                    }
-                    for r in by_category
-                ],
-                "monthly": [
-                    {"month": r["month"].isoformat() if r["month"] else None, "type": r["type"], "total": str(r["total"])}
-                    for r in monthly
-                ],
+                "by_category": by_category,
+                "monthly": monthly,
             }
         )

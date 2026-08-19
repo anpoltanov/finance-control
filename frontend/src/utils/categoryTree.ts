@@ -87,7 +87,7 @@ export function filterCategoriesForTransaction(
   transactionType: "expense" | "income" | "transfer"
 ): CategoryTreeNode[] {
   if (transactionType === "transfer") return [];
-  return buildCategoryTree(categories.filter((c) => c.type === transactionType));
+  return buildCategoryTree(categories);
 }
 
 export function priorityLabel(priority: Category["priority"]): string | null {

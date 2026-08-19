@@ -26,6 +26,17 @@ export default function ReportsPage() {
     setSyncStatus(t("reports.syncedAt", { time: new Date().toISOString() }));
   }
 
+  const currencyTooltip = {
+    callbacks: {
+      label: (ctx: { dataset?: { label?: string }; label?: string; parsed: number | { y?: number } | null }) => {
+        const parsed = ctx.parsed;
+        const value = typeof parsed === "number" ? parsed : parsed?.y ?? 0;
+        const name = ctx.dataset?.label || ctx.label || "";
+        return `${name ? `${name}: ` : ""}${formatCurrency(value)}`;
+      },
+    },
+  };
+
   const categoryData = report
     ? {
         labels: report.by_category.map((c) => c.category_name),
@@ -82,11 +93,35 @@ export default function ReportsPage() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
             <div className="card">
               <h3>{t("reports.byCategory")}</h3>
-              {report.by_category.length > 0 && categoryData ? <Doughnut data={categoryData} /> : <p>{t("common.noData")}</p>}
+              {report.by_category.length > 0 && categoryData ? (
+                <Doughnut
+                  data={categoryData}
+                  options={{
+                    plugins: { tooltip: currencyTooltip },
+                  }}
+                />
+              ) : (
+                <p>{t("common.noData")}</p>
+              )}
             </div>
             <div className="card">
               <h3>{t("reports.monthlyTrends")}</h3>
-              {months.length > 0 && barData ? <Bar data={barData} options={{ responsive: true }} /> : <p>{t("common.noData")}</p>}
+              {months.length > 0 && barData ? (
+                <Bar
+                  data={barData}
+                  options={{
+                    responsive: true,
+                    plugins: { tooltip: currencyTooltip },
+                    scales: {
+                      y: {
+                        ticks: { callback: (value) => formatCurrency(Number(value)) },
+                      },
+                    },
+                  }}
+                />
+              ) : (
+                <p>{t("common.noData")}</p>
+              )}
             </div>
           </div>
         </>

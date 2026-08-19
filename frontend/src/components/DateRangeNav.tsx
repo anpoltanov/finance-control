@@ -128,6 +128,8 @@ export default function DateRangeNav({ range }: DateRangeNavProps) {
   const { t } = useTranslation();
   const [jumpOpen, setJumpOpen] = useState(false);
   const jumpRef = useRef<HTMLDivElement>(null);
+  const hideNav = range.periodType === "all";
+  const canJump = range.periodType !== "custom" && range.periodType !== "all";
 
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
@@ -137,30 +139,38 @@ export default function DateRangeNav({ range }: DateRangeNavProps) {
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
 
+  useEffect(() => {
+    setJumpOpen(false);
+  }, [range.periodType]);
+
   return (
     <div className="date-range-nav">
-      <button type="button" className="secondary date-range-step" onClick={range.prev} aria-label={t("dateRange.prev")}>
-        ‹
-      </button>
+      {!hideNav && (
+        <button type="button" className="secondary date-range-step" onClick={range.prev} aria-label={t("dateRange.prev")}>
+          ‹
+        </button>
+      )}
       <div className="date-range-jump" ref={jumpRef}>
         <button
           type="button"
           className="date-range-jump-btn"
-          onClick={() => range.periodType !== "custom" && setJumpOpen((v) => !v)}
+          onClick={() => canJump && setJumpOpen((v) => !v)}
           aria-expanded={jumpOpen}
-          aria-haspopup="dialog"
-          disabled={range.periodType === "custom"}
+          aria-haspopup={canJump ? "dialog" : undefined}
+          disabled={!canJump}
         >
           <span>{range.label}</span>
-          {range.periodType !== "custom" && <GlyphIcon icon="expand_more" />}
+          {canJump && <GlyphIcon icon="expand_more" />}
         </button>
-        {jumpOpen && range.periodType !== "custom" && (
+        {jumpOpen && canJump && (
           <PeriodJumpPanel range={range} onClose={() => setJumpOpen(false)} />
         )}
       </div>
-      <button type="button" className="secondary date-range-step" onClick={range.next} aria-label={t("dateRange.next")}>
-        ›
-      </button>
+      {!hideNav && (
+        <button type="button" className="secondary date-range-step" onClick={range.next} aria-label={t("dateRange.next")}>
+          ›
+        </button>
+      )}
       <label className="date-range-type-wrap">
         <select
           className="date-range-type"
@@ -171,6 +181,7 @@ export default function DateRangeNav({ range }: DateRangeNavProps) {
           <option value="week">{t("dateRange.week")}</option>
           <option value="month">{t("dateRange.month")}</option>
           <option value="year">{t("dateRange.year")}</option>
+          <option value="all">{t("dateRange.allTime")}</option>
           <option value="custom">{t("dateRange.custom")}</option>
         </select>
       </label>

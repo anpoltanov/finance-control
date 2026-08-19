@@ -29,7 +29,7 @@ class WalletAppImportView(APIView):
             resolutions = resolutions_raw or {}
 
         if dry_run:
-            preview = preview_import(rows, resolutions)
+            preview = preview_import(rows, resolutions, user=request.user)
             return Response(preview_to_dict(preview))
 
         result = commit_import(request.user, rows, resolutions)
