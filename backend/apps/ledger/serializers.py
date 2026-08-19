@@ -3,6 +3,14 @@ from rest_framework import serializers
 from apps.ledger.models import Account, Category, Tag, Transaction
 
 
+def set_many_related_queryset(field, queryset):
+    """DRF wraps many=True PK fields in ManyRelatedField; queryset lives on child_relation."""
+    field.queryset = queryset
+    child = getattr(field, "child_relation", None)
+    if child is not None:
+        child.queryset = queryset
+
+
 class AccountSerializer(serializers.ModelSerializer):
     balance = serializers.SerializerMethodField()
 
@@ -108,8 +116,10 @@ class TransactionSerializer(serializers.ModelSerializer):
         super().__init__(*args, **kwargs)
         request = self.context.get("request")
         user = getattr(request, "user", None)
+        qs = Tag.objects.none()
         if user is not None and getattr(user, "is_authenticated", False):
-            self.fields["tag_ids"].queryset = Tag.objects.filter(user=user)
+            qs = Tag.objects.filter(user=user, deleted_at__isnull=True)
+        set_many_related_queryset(self.fields["tag_ids"], qs)
 
     def get_tag_names(self, obj):
         return list(obj.tags.values_list("name", flat=True))

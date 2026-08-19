@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from apps.ledger.models import Tag, Transaction
+from apps.ledger.serializers import set_many_related_queryset
 from apps.planning.models import PlannedTransaction
 
 
@@ -42,8 +43,10 @@ class PlannedTransactionSerializer(serializers.ModelSerializer):
         super().__init__(*args, **kwargs)
         request = self.context.get("request")
         user = getattr(request, "user", None)
+        qs = Tag.objects.none()
         if user is not None and getattr(user, "is_authenticated", False):
-            self.fields["tag_ids"].queryset = Tag.objects.filter(user=user)
+            qs = Tag.objects.filter(user=user, deleted_at__isnull=True)
+        set_many_related_queryset(self.fields["tag_ids"], qs)
 
     def validate(self, attrs):
         tx_type = attrs.get("type", getattr(self.instance, "type", None))

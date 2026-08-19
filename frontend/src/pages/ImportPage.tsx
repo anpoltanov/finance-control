@@ -1,9 +1,8 @@
 import { useState } from "react";
-
 import { useTranslation } from "react-i18next";
-
 import { importWalletAppCsv, type ImportPreview } from "../api/client";
-
+import { db } from "../db";
+import { runSync } from "../hooks/useOfflineSync";
 import { formatCurrency, formatDateTime } from "../utils/format";
 
 
@@ -75,6 +74,18 @@ export default function ImportPage({ embedded = false }: { embedded?: boolean })
       setResult(t("import.result", { created, skipped }));
 
       setPreview(null);
+
+      try {
+
+        await db.meta.delete("last_synced_at");
+
+        await runSync();
+
+      } catch {
+
+        /* Import already committed; the next periodic sync will pull records. */
+
+      }
 
     } catch (err) {
 
