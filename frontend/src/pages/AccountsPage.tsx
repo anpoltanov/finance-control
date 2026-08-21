@@ -36,18 +36,6 @@ export default function AccountsPage({ embedded = false }: { embedded?: boolean 
             account={account}
             compact={false}
             onClick={() => navigate(`/accounts/${account.id}`)}
-            actions={
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => {
-                  setEditing(account);
-                  setModalOpen(true);
-                }}
-              >
-                {t("common.edit")}
-              </button>
-            }
           />
         ))}
       </div>

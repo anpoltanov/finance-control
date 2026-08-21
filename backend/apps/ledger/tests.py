@@ -127,3 +127,51 @@ class ReportExcludeAccountTests(APITestCase):
         self.assertEqual(Decimal(res.data["income_total"]), Decimal("7.00"))
         self.assertEqual(len(res.data["by_category"]), 1)
         self.assertEqual(Decimal(res.data["by_category"][0]["total"]), Decimal("15.00"))
+
+    def test_income_on_expense_category_reduces_expense_not_income(self):
+        Transaction.objects.create(
+            user=self.user,
+            type=Transaction.TYPE_EXPENSE,
+            account=self.counted,
+            amount=Decimal("20.00"),
+            category=self.food,
+            date=aware(2026, 8, 10),
+        )
+        Transaction.objects.create(
+            user=self.user,
+            type=Transaction.TYPE_INCOME,
+            account=self.counted,
+            amount=Decimal("5.00"),
+            category=self.food,
+            date=aware(2026, 8, 12),
+        )
+        salary = Category.objects.create(user=self.user, name="Salary", type=Category.TYPE_INCOME)
+        Transaction.objects.create(
+            user=self.user,
+            type=Transaction.TYPE_INCOME,
+            account=self.counted,
+            amount=Decimal("40.00"),
+            category=salary,
+            date=aware(2026, 8, 15),
+        )
+        res = self.client.get("/api/v1/reports/summary/", {"from": "2026-08-01", "to": "2026-08-31T23:59:59"})
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(Decimal(res.data["expense_total"]), Decimal("15.00"))
+        self.assertEqual(Decimal(res.data["income_total"]), Decimal("40.00"))
+        self.assertEqual(len(res.data["by_category"]), 1)
+        self.assertEqual(Decimal(res.data["by_category"][0]["total"]), Decimal("15.00"))
+
+
+class ClassifyCashFlowUnitTests(APITestCase):
+    def test_refund_and_uncategorized_fallback(self):
+        from apps.ledger.stats import classify_cash_flow
+
+        income, expense = classify_cash_flow(Transaction.TYPE_INCOME, Decimal("5"), Category.TYPE_EXPENSE)
+        self.assertEqual(income, Decimal("0"))
+        self.assertEqual(expense, Decimal("-5"))
+        income, expense = classify_cash_flow(Transaction.TYPE_EXPENSE, Decimal("8"), Category.TYPE_INCOME)
+        self.assertEqual(income, Decimal("-8"))
+        self.assertEqual(expense, Decimal("0"))
+        income, expense = classify_cash_flow(Transaction.TYPE_INCOME, Decimal("3"), None)
+        self.assertEqual(income, Decimal("3"))
+        self.assertEqual(expense, Decimal("0"))

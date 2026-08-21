@@ -1,5 +1,6 @@
 import type { Account, Category, Transaction } from "../api/client";
 import { db } from "../db";
+import { classifyCashFlow } from "../utils/classify";
 import { listAccounts } from "./queries";
 import { getChildren, resolveCategoryColor } from "../utils/categoryTree";
 
@@ -89,6 +90,7 @@ function inRange(tx: Transaction, fromMs: number, toMs: number): boolean {
 function cashFlowFor(
   txs: Transaction[],
   accounts: Map<number, Account>,
+  categoriesById: Map<number, Category>,
   fromMs: number,
   toMs: number
 ): CashFlow {
@@ -98,9 +100,9 @@ function cashFlowFor(
     if (!inRange(tx, fromMs, toMs)) continue;
     const acc = accounts.get(tx.account);
     if (!acc || acc.exclude_from_statistics) continue;
-    const amt = parseFloat(tx.amount) || 0;
-    if (tx.type === "income") income += amt;
-    if (tx.type === "expense") expense += amt;
+    const classified = classifyCashFlow(tx, categoriesById);
+    income += classified.income;
+    expense += classified.expense;
   }
   return { income, expense, net: income - expense };
 }
@@ -194,18 +196,24 @@ export function expenseSlices(
   return slices.sort((a, b) => b.total - a.total);
 }
 
-export async function loadDashboard(from: string, to: string): Promise<DashboardSnapshot> {
+export async function loadDashboard(from?: string, to?: string): Promise<DashboardSnapshot> {
   const [accounts, categories, txs] = await Promise.all([
     listAccounts(),
     db.categories.toArray(),
     db.transactions.toArray(),
   ]);
   const byId = new Map(accounts.map((a) => [a.id, a]));
-  const fromMs = parseYmd(from).getTime();
-  const toMs = rangeEndMs(to);
-  const prev = previousEqualRange(from, to);
-  const prevFromMs = parseYmd(prev.from).getTime();
-  const prevToMs = rangeEndMs(prev.to);
+  const categoriesById = new Map(categories.map((c) => [c.id, c]));
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const txTimes = txs.map((tx) => new Date(tx.date).getTime()).filter((t) => Number.isFinite(t));
+  const earliest = txTimes.length ? Math.min(...txTimes) : todayStart.getTime();
+  const fromMs = from ? parseYmd(from).getTime() : earliest;
+  const toMs = to ? rangeEndMs(to) : new Date(todayStart.getFullYear(), todayStart.getMonth(), todayStart.getDate(), 23, 59, 59, 999).getTime();
+  const hasBoundedRange = Boolean(from && to);
+  const prev = hasBoundedRange ? previousEqualRange(from!, to!) : null;
+  const prevFromMs = prev ? parseYmd(prev.from).getTime() : 0;
+  const prevToMs = prev ? rangeEndMs(prev.to) : fromMs - 1;
 
   const statistical = accounts.filter((a) => !a.exclude_from_statistics);
   const plates = accounts.filter((a) => !a.archived);
@@ -217,19 +225,23 @@ export async function loadDashboard(from: string, to: string): Promise<Dashboard
   const currentBalance = statistical.reduce((sum, a) => sum + parseFloat(a.balance), 0);
   const previousBalance = statisticalBalanceAt(accounts, txs, prevToMs + 1);
 
-  const period = cashFlowFor(txs, byId, fromMs, toMs);
-  const previousPeriod = cashFlowFor(txs, byId, prevFromMs, prevToMs);
+  const period = cashFlowFor(txs, byId, categoriesById, fromMs, toMs);
+  const previousPeriod = hasBoundedRange
+    ? cashFlowFor(txs, byId, categoriesById, prevFromMs, prevToMs)
+    : { income: 0, expense: 0, net: 0 };
 
   let running = statisticalBalanceAt(accounts, txs, fromMs);
   const labels: string[] = [];
   const values: number[] = [];
-  const today = new Date();
-  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const rangeEnd = parseYmd(to);
+  const rangeEnd = to ? parseYmd(to) : todayStart;
+  const seriesStart = new Date(fromMs);
   const seriesEnd = rangeEnd.getTime() > todayStart.getTime() ? todayStart : rangeEnd;
-  for (let day = parseYmd(from); day.getTime() <= seriesEnd.getTime(); day = addDays(day, 1)) {
+  const maxPoints = 400;
+  const daySpan = Math.max(1, Math.round((seriesEnd.getTime() - seriesStart.getTime()) / 86400000) + 1);
+  const step = daySpan > maxPoints ? Math.ceil(daySpan / maxPoints) : 1;
+  for (let day = seriesStart; day.getTime() <= seriesEnd.getTime(); day = addDays(day, step)) {
     const dayStart = day.getTime();
-    const dayEnd = addDays(day, 1).getTime();
+    const dayEnd = addDays(day, step).getTime();
     for (const tx of txs) {
       const t = new Date(tx.date).getTime();
       if (t >= dayStart && t < dayEnd) running += statisticalDelta(tx, byId);
@@ -240,11 +252,15 @@ export async function loadDashboard(from: string, to: string): Promise<Dashboard
 
   const expenseByCategory = new Map<number, number>();
   for (const tx of txs) {
-    if (tx.type !== "expense" || !tx.category) continue;
+    if (!tx.category) continue;
     if (!inRange(tx, fromMs, toMs)) continue;
     const acc = byId.get(tx.account);
     if (!acc || acc.exclude_from_statistics) continue;
-    expenseByCategory.set(tx.category, (expenseByCategory.get(tx.category) || 0) + parseFloat(tx.amount));
+    const cat = categoriesById.get(tx.category);
+    if (cat?.type !== "expense") continue;
+    const classified = classifyCashFlow(tx, categoriesById);
+    if (classified.expense === 0) continue;
+    expenseByCategory.set(tx.category, (expenseByCategory.get(tx.category) || 0) + classified.expense);
   }
 
   return {

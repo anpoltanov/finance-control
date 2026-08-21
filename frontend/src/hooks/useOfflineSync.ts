@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { api } from "../api/client";
-import { applySyncPayload, flushOutbox, getLastSyncedAt } from "../db/index";
+import { applySyncPayload, clearLocalCache, flushOutbox, getLastSyncedAt } from "../db/index";
 
 const SYNC_INTERVAL_MS = 60_000;
 const PERMANENT_FAILURE = new Set([400, 404, 409, 422]);
@@ -37,6 +37,12 @@ export async function runSync(): Promise<void> {
   }
   const since = await getLastSyncedAt();
   const payload = await api.sync(since);
+  await applySyncPayload(payload);
+}
+
+export async function resetLocalCache(): Promise<void> {
+  await clearLocalCache();
+  const payload = await api.sync();
   await applySyncPayload(payload);
 }
 

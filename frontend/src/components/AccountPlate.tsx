@@ -43,12 +43,16 @@ export default function AccountPlate({ account, onClick, actions, compact = true
         <div className="account-plate-text">
           <div className="account-plate-title-row">
             <strong className="account-plate-title">{account.title}</strong>
-            {account.archived && <span className="badge">{t("accounts.archived")}</span>}
-            {account.exclude_from_statistics && (
-              <span className="badge">{t("accounts.excludedBadge")}</span>
-            )}
           </div>
           <p className="account-plate-balance">{formatCurrency(account.balance, account.currency_code)}</p>
+          {(account.archived || account.exclude_from_statistics) && (
+            <div className="account-plate-badges">
+              {account.archived && <span className="badge">{t("accounts.archived")}</span>}
+              {account.exclude_from_statistics && (
+                <span className="badge">{t("accounts.excludedBadge")}</span>
+              )}
+            </div>
+          )}
         </div>
       </div>
       {actions && (

@@ -7,7 +7,7 @@ import DateRangeNav from "../components/DateRangeNav";
 import { computeReportSummary } from "../data/reports";
 import { runSync } from "../hooks/useOfflineSync";
 import { useDateRangePeriod } from "../hooks/useDateRangePeriod";
-import { formatCurrency } from "../utils/format";
+import { formatCurrency, chartNumericValue } from "../utils/format";
 
 ChartJS.register(ArcElement, CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
@@ -82,11 +82,53 @@ export default function ReportsPage() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
             <div className="card">
               <h3>{t("reports.byCategory")}</h3>
-              {report.by_category.length > 0 && categoryData ? <Doughnut data={categoryData} /> : <p>{t("common.noData")}</p>}
+              {report.by_category.length > 0 && categoryData ? (
+                <Doughnut
+                  data={categoryData}
+                  options={{
+                    plugins: {
+                      tooltip: {
+                        callbacks: {
+                          label: (ctx) => {
+                            const name = ctx.label ? `${ctx.label}: ` : "";
+                            return `${name}${formatCurrency(chartNumericValue(ctx.parsed))}`;
+                          },
+                        },
+                      },
+                    },
+                  }}
+                />
+              ) : (
+                <p>{t("common.noData")}</p>
+              )}
             </div>
             <div className="card">
               <h3>{t("reports.monthlyTrends")}</h3>
-              {months.length > 0 && barData ? <Bar data={barData} options={{ responsive: true }} /> : <p>{t("common.noData")}</p>}
+              {months.length > 0 && barData ? (
+                <Bar
+                  data={barData}
+                  options={{
+                    responsive: true,
+                    plugins: {
+                      tooltip: {
+                        callbacks: {
+                          label: (ctx) => {
+                            const name = ctx.dataset.label ? `${ctx.dataset.label}: ` : "";
+                            return `${name}${formatCurrency(chartNumericValue(ctx.parsed))}`;
+                          },
+                        },
+                      },
+                    },
+                    scales: {
+                      y: {
+                        ticks: { callback: (value) => formatCurrency(Number(value)) },
+                      },
+                    },
+                  }}
+                />
+              ) : (
+                <p>{t("common.noData")}</p>
+              )}
             </div>
           </div>
         </>

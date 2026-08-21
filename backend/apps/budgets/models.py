@@ -4,10 +4,10 @@ from decimal import Decimal
 from dateutil.relativedelta import relativedelta
 from django.contrib.auth.models import User
 from django.db import models
-from django.db.models import Sum
 from django.utils import timezone
 
 from apps.ledger.models import Category, TimestampedModel, Transaction
+from apps.ledger.stats import classify_cash_flow
 
 
 class Budget(TimestampedModel):
@@ -45,19 +45,27 @@ class Budget(TimestampedModel):
         return period_start, period_end
 
     def spent_in_period(self, period_start: date, period_end: date) -> Decimal:
-        qs = Transaction.objects.filter(
-            user=self.user,
-            type=Transaction.TYPE_EXPENSE,
-            date__date__gte=period_start,
-            date__date__lte=period_end,
-            deleted_at__isnull=True,
-            account__exclude_from_statistics=False,
+        qs = (
+            Transaction.objects.filter(
+                user=self.user,
+                date__date__gte=period_start,
+                date__date__lte=period_end,
+                deleted_at__isnull=True,
+                account__exclude_from_statistics=False,
+            )
+            .exclude(type=Transaction.TYPE_TRANSFER)
+            .select_related("category")
         )
         selected_ids = list(self.categories.values_list("id", flat=True))
         if selected_ids:
             expanded = Category.ids_with_descendants(self.user, selected_ids)
             qs = qs.filter(category_id__in=expanded)
-        return qs.aggregate(total=Sum("amount"))["total"] or Decimal("0")
+        spent = Decimal("0")
+        for tx in qs:
+            category_type = tx.category.type if tx.category_id else None
+            _income, expense = classify_cash_flow(tx.type, tx.amount, category_type)
+            spent += expense
+        return spent
 
     def compute_status(self, reference: date | None = None) -> dict:
         period_start, period_end = self.period_bounds(reference)

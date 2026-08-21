@@ -124,6 +124,23 @@ export async function queueOutbox(item: Omit<OutboxItem, "id" | "createdAt">) {
   await db.outbox.add({ ...item, createdAt: new Date().toISOString() });
 }
 
+export async function clearLocalCache(): Promise<void> {
+  await db.transaction(
+    "rw",
+    [db.accounts, db.categories, db.tags, db.transactions, db.budgets, db.planned, db.meta, db.outbox],
+    async () => {
+      await db.accounts.clear();
+      await db.categories.clear();
+      await db.tags.clear();
+      await db.transactions.clear();
+      await db.budgets.clear();
+      await db.planned.clear();
+      await db.meta.clear();
+      await db.outbox.clear();
+    }
+  );
+}
+
 export async function nextTempId(): Promise<number> {
   const row = await db.meta.get("temp_id_seq");
   const next = (row ? Number(row.value) : 0) - 1;

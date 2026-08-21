@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { formatLocale } from "../i18n";
 
-export type PeriodType = "week" | "month" | "year" | "custom";
+export type PeriodType = "week" | "month" | "year" | "custom" | "all";
 
 export interface DateRangePeriod {
   periodType: PeriodType;
@@ -51,6 +51,7 @@ function addDays(d: Date, days: number): Date {
 }
 
 function boundsFor(periodType: PeriodType, anchor: Date, customFrom: string, customTo: string): { from: Date; to: Date } | null {
+  if (periodType === "all") return null;
   if (periodType === "week") {
     const from = startOfWeek(anchor);
     return { from, to: addDays(from, 6) };
@@ -123,6 +124,7 @@ export function useDateRangePeriod(initial: PeriodType = "month"): DateRangePeri
   const toParam = to ? `${to}T23:59:59` : "";
   const isCurrent = bounds ? isCurrentPeriod(periodType, bounds.from, bounds.to) : false;
   const label = useMemo(() => {
+    if (periodType === "all") return t("dateRange.allTime");
     if (!bounds) return t("dateRange.custom");
     return formatRangeLabel(periodType, bounds.from, bounds.to, isCurrent, t);
   }, [bounds, periodType, isCurrent, t, i18n.language]);
@@ -141,6 +143,7 @@ export function useDateRangePeriod(initial: PeriodType = "month"): DateRangePeri
   }
 
   function prev() {
+    if (periodType === "all") return;
     if (periodType === "custom") {
       const current = boundsFor("custom", anchorDate, customFrom, customTo);
       if (!current) return;
@@ -158,6 +161,7 @@ export function useDateRangePeriod(initial: PeriodType = "month"): DateRangePeri
   }
 
   function next() {
+    if (periodType === "all") return;
     if (periodType === "custom") {
       const current = boundsFor("custom", anchorDate, customFrom, customTo);
       if (!current) return;
@@ -175,6 +179,7 @@ export function useDateRangePeriod(initial: PeriodType = "month"): DateRangePeri
   }
 
   function jumpTo(anchor: Date) {
+    if (periodType === "all") return;
     if (periodType === "custom") {
       const length = bounds
         ? Math.round((bounds.to.getTime() - bounds.from.getTime()) / 86400000) + 1

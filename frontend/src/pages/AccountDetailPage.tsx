@@ -1,8 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useTranslation } from "react-i18next";
 import type { Transaction } from "../api/client";
+import AccountFormModal from "../components/AccountFormModal";
 import GlyphIcon from "../components/GlyphIcon";
 import TransactionList from "../components/TransactionList";
 import { useAddTransaction } from "../context/AddTransactionContext";
@@ -14,6 +15,7 @@ export default function AccountDetailPage() {
   const { accountId } = useParams<{ accountId: string }>();
   const id = Number(accountId);
   const { openAddTransaction, openEditTransaction } = useAddTransaction();
+  const [editOpen, setEditOpen] = useState(false);
 
   const queryFilters = useMemo(() => ({ account: String(id) }), [id]);
 
@@ -41,16 +43,29 @@ export default function AccountDetailPage() {
             </div>
           </div>
         </div>
-        <button type="button" onClick={() => openAddTransaction({ account: id })}>
-          {t("transactions.add")}
-        </button>
+        <div className="account-detail-actions">
+          <button type="button" className="secondary" onClick={() => setEditOpen(true)}>
+            {t("common.edit")}
+          </button>
+          <button type="button" onClick={() => openAddTransaction({ account: id })}>
+            {t("transactions.add")}
+          </button>
+        </div>
       </div>
+
+      <p className="muted-text tx-count">{t("transactions.count", { count: transactions.length })}</p>
 
       <TransactionList
         transactions={transactions}
         perspectiveAccountId={id}
         hideAccountColumn
         onEdit={(tx: Transaction) => openEditTransaction(tx)}
+      />
+      <AccountFormModal
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        onSaved={() => undefined}
+        account={account}
       />
     </div>
   );

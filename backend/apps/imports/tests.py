@@ -5,7 +5,7 @@ from django.test import TestCase
 from rest_framework.test import APITestCase
 
 from apps.imports.walletapp import commit_import, parse_walletapp_csv, preview_import
-from apps.ledger.models import Transaction
+from apps.ledger.models import Account, Category, Tag, Transaction
 
 
 SAMPLE_CSV = """account;category;currency;amount;ref_currency_amount;type;payment_type;note;date;transfer;payee;labels
@@ -44,6 +44,48 @@ class WalletAppImportTest(TestCase):
         self.assertEqual(transfer.transfer_kind, Transaction.TRANSFER_ACCOUNT)
         self.assertEqual(transfer.account.title, "ВТБ Андрей")
         self.assertEqual(transfer.to_account.title, "Сбер Андрей")
+
+
+class ImportReuseExistingTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="reuse", password="p")
+        self.account = Account.objects.create(user=self.user, title="Cash")
+        self.parent = Category.objects.create(user=self.user, name="Food", type=Category.TYPE_EXPENSE)
+        self.nested = Category.objects.create(
+            user=self.user, name="Groceries", type=Category.TYPE_EXPENSE, parent=self.parent
+        )
+        Tag.objects.create(user=self.user, name="market")
+
+    def test_preview_omits_existing_nested_category_account_and_tag(self):
+        csv = """account;category;currency;amount;ref_currency_amount;type;payment_type;note;date;transfer;payee;labels
+cash;Groceries;RUB;10;10;Расход;Card;;2026-08-01T12:00:00.000Z;false;;market
+"""
+        preview = preview_import(parse_walletapp_csv(csv), user=self.user)
+        self.assertEqual(preview.new_accounts, [])
+        self.assertEqual(preview.new_categories, [])
+        self.assertEqual(preview.new_tags, [])
+
+    def test_commit_reuses_nested_category_instead_of_creating_top_level(self):
+        csv = """account;category;currency;amount;ref_currency_amount;type;payment_type;note;date;transfer;payee;labels
+CASH;Groceries;RUB;12;12;Расход;Card;;2026-08-02T12:00:00.000Z;false;;MARKET
+"""
+        result = commit_import(self.user, parse_walletapp_csv(csv))
+        self.assertEqual(result["created"], 1)
+        self.assertEqual(Category.objects.filter(user=self.user).count(), 2)
+        tx = Transaction.objects.get(user=self.user)
+        self.assertEqual(tx.category_id, self.nested.id)
+        self.assertEqual(tx.category.parent_id, self.parent.id)
+        self.assertEqual(tx.account_id, self.account.id)
+        self.assertEqual(list(tx.tags.values_list("name", flat=True)), ["market"])
+
+    def test_commit_walks_parent_child_path(self):
+        csv = """account;category;currency;amount;ref_currency_amount;type;payment_type;note;date;transfer;payee;labels
+Cash;Food / Groceries;RUB;8;8;Расход;Card;;2026-08-03T12:00:00.000Z;false;;
+"""
+        commit_import(self.user, parse_walletapp_csv(csv))
+        self.assertEqual(Category.objects.filter(user=self.user).count(), 2)
+        tx = Transaction.objects.get(user=self.user)
+        self.assertEqual(tx.category_id, self.nested.id)
 
 
 class ImportThenSyncTests(APITestCase):

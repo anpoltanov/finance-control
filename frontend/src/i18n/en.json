@@ -74,7 +74,21 @@
     "tabs": {
       "accounts": "Accounts",
       "categories": "Categories & Tags",
-      "import": "Import"
+      "import": "Import",
+      "data": "Data"
+    },
+    "data": {
+      "title": "Local data",
+      "hint": "Sync pulls the latest records from the server. Reset clears this device’s cache, including unsynced changes, then reloads everything as on a new device.",
+      "syncNow": "Sync now",
+      "syncing": "Syncing…",
+      "synced": "Synced at {{time}}",
+      "syncFailed": "Sync failed",
+      "reset": "Reset local data",
+      "resetConfirm": "Clear all local data on this device? Unsynced changes will be discarded. Data on the server is kept.",
+      "resetting": "Resetting…",
+      "resetDone": "Local data reloaded from the server",
+      "resetFailed": "Could not reload local data"
     }
   },
   "txType": {
@@ -105,6 +119,7 @@
     "month": "Month",
     "year": "Year",
     "custom": "Custom",
+    "allTime": "All time",
     "prev": "Previous period",
     "next": "Next period",
     "jumpTo": "Jump to period",
@@ -170,6 +185,8 @@
     "new": "New transaction",
     "edit": "Edit transaction",
     "empty": "No transactions",
+    "count_one": "{{count}} operation",
+    "count_other": "{{count}} operations",
     "recipient": "Recipient",
     "noTagsYet": "No tags yet"
   },

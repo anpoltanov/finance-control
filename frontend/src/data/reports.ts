@@ -1,5 +1,6 @@
 import type { Budget, BudgetStatus, ReportSummary } from "../api/client";
 import { db } from "../db";
+import { classifyCashFlow } from "../utils/classify";
 import { expandCategoryIds, resolveCategoryColor } from "../utils/categoryTree";
 
 function addMonths(date: Date, months: number): Date {
@@ -42,11 +43,12 @@ async function spentInPeriod(budget: Budget, periodStart: Date, periodEnd: Date)
   const endMs = new Date(periodEnd.getFullYear(), periodEnd.getMonth(), periodEnd.getDate(), 23, 59, 59).getTime();
   const [accounts, categories] = await Promise.all([db.accounts.toArray(), db.categories.toArray()]);
   const excluded = new Set(accounts.filter((a) => a.exclude_from_statistics).map((a) => a.id));
+  const categoriesById = new Map(categories.map((c) => [c.id, c]));
   const categorySet =
     budget.category_ids?.length ? expandCategoryIds(categories, budget.category_ids) : null;
   const txs = await db.transactions
     .filter((tx) => {
-      if (tx.type !== "expense") return false;
+      if (tx.type === "transfer") return false;
       if (excluded.has(tx.account)) return false;
       const t = new Date(tx.date).getTime();
       if (t < startMs || t > endMs) return false;
@@ -56,7 +58,7 @@ async function spentInPeriod(budget: Budget, periodStart: Date, periodEnd: Date)
       return true;
     })
     .toArray();
-  return txs.reduce((sum, tx) => sum + parseFloat(tx.amount), 0);
+  return txs.reduce((sum, tx) => sum + classifyCashFlow(tx, categoriesById).expense, 0);
 }
 
 export async function computeBudgetStatus(budget: Budget, reference = new Date()): Promise<BudgetStatus> {
@@ -113,29 +115,30 @@ export async function computeReportSummary(from?: string, to?: string): Promise<
   }
 
   const categories = await db.categories.toArray();
+  const categoriesById = new Map(categories.map((c) => [c.id, c]));
   let income = 0;
   let expense = 0;
   const byCategoryMap = new Map<number, number>();
   const monthlyMap = new Map<string, { expense: number; income: number }>();
 
   for (const tx of txs) {
-    const amount = parseFloat(tx.amount);
-    if (tx.type === "income") income += amount;
-    if (tx.type === "expense") {
-      expense += amount;
-      if (tx.category) {
-        byCategoryMap.set(tx.category, (byCategoryMap.get(tx.category) || 0) + amount);
-      }
+    const classified = classifyCashFlow(tx, categoriesById);
+    income += classified.income;
+    expense += classified.expense;
+    if (tx.category && classified.expense !== 0 && categoriesById.get(tx.category)?.type === "expense") {
+      byCategoryMap.set(tx.category, (byCategoryMap.get(tx.category) || 0) + classified.expense);
     }
-    if (tx.type === "expense" || tx.type === "income") {
+    if (classified.income !== 0 || classified.expense !== 0) {
       const monthKey = tx.date.slice(0, 7);
       const bucket = monthlyMap.get(monthKey) || { expense: 0, income: 0 };
-      bucket[tx.type] += amount;
+      bucket.income += classified.income;
+      bucket.expense += classified.expense;
       monthlyMap.set(monthKey, bucket);
     }
   }
 
   const by_category = [...byCategoryMap.entries()]
+    .filter(([, total]) => total > 0)
     .map(([category_id, total]) => {
       const cat = categories.find((c) => c.id === category_id);
       return {

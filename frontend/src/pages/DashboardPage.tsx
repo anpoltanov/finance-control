@@ -12,7 +12,7 @@ export default function DashboardPage() {
   const range = useDateRangePeriod("month");
   const navigate = useNavigate();
   const data = useLiveQuery(
-    () => (range.from && range.to ? loadDashboard(range.from, range.to) : undefined),
+    () => loadDashboard(range.from || undefined, range.to || undefined),
     [range.from, range.to]
   );
 

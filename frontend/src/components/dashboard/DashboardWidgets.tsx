@@ -15,9 +15,9 @@ import {
 import { Doughnut, Line } from "react-chartjs-2";
 import { useTranslation } from "react-i18next";
 import { expenseSlices, pctChange, type DashboardSnapshot } from "../../data/dashboard";
-import { formatCurrency } from "../../utils/format";
+import { formatCurrency, chartNumericValue } from "../../utils/format";
 import GlyphIcon from "../GlyphIcon";
-import SemiGauge, { PctBadge } from "./SemiGauge";
+import SemiGauge, { PctBadge, trendColor } from "./SemiGauge";
 
 ChartJS.register(ArcElement, CategoryScale, LinearScale, LineElement, PointElement, Filler, Tooltip, Legend);
 
@@ -44,6 +44,9 @@ export default function DashboardWidgets({ data }: DashboardWidgetsProps) {
   const series = data.balanceSeries;
   const endBalance = series.values.length ? series.values[series.values.length - 1] : data.currentBalance;
   const flowMax = Math.max(data.period.income, data.period.expense, 1);
+  const balancePct = pctChange(data.currentBalance, data.previousBalance);
+  const cashFlowPct = pctChange(data.period.net, data.previousPeriod.net);
+  const expensePct = pctChange(data.period.expense, data.previousPeriod.expense);
 
   function onSliceClick(_event: ChartEvent, elements: ActiveElement[]) {
     const index = elements[0]?.index;
@@ -62,24 +65,25 @@ export default function DashboardWidgets({ data }: DashboardWidgetsProps) {
             display={formatCurrency(data.currentBalance, currency)}
             value={data.currentBalance}
             max={gaugeMax(data.currentBalance, data.previousBalance)}
-            color="var(--primary)"
-            pct={pctChange(data.currentBalance, data.previousBalance)}
+            color={trendColor(balancePct)}
+            pct={balancePct}
           />
           <SemiGauge
             label={t("dashboard.periodCashFlow")}
             display={formatCurrency(data.period.net, currency)}
             value={data.period.net}
             max={gaugeMax(data.period.net, data.previousPeriod.net)}
-            color={data.period.net >= 0 ? "var(--success)" : "var(--danger)"}
-            pct={pctChange(data.period.net, data.previousPeriod.net)}
+            color={trendColor(cashFlowPct)}
+            pct={cashFlowPct}
           />
           <SemiGauge
             label={t("dashboard.periodExpenses")}
             display={formatCurrency(data.period.expense, currency)}
             value={data.period.expense}
             max={gaugeMax(data.period.expense, data.previousPeriod.expense)}
-            color="var(--danger)"
-            pct={pctChange(data.period.expense, data.previousPeriod.expense)}
+            color={trendColor(expensePct, true)}
+            pct={expensePct}
+            invert
           />
         </div>
       </section>
@@ -112,8 +116,21 @@ export default function DashboardWidgets({ data }: DashboardWidgetsProps) {
             options={{
               responsive: true,
               maintainAspectRatio: false,
-              plugins: { legend: { display: false } },
-              scales: { x: { grid: { display: false } }, y: { grid: { color: "rgba(100,116,139,0.2)" } } },
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  callbacks: {
+                    label: (ctx) => formatCurrency(chartNumericValue(ctx.parsed), currency),
+                  },
+                },
+              },
+              scales: {
+                x: { grid: { display: false } },
+                y: {
+                  grid: { color: "rgba(100,116,139,0.2)" },
+                  ticks: { callback: (value) => formatCurrency(Number(value), currency) },
+                },
+              },
             }}
           />
           </div>
@@ -125,7 +142,7 @@ export default function DashboardWidgets({ data }: DashboardWidgetsProps) {
       <section className="card widget-card">
         <div className="widget-header">
           <h3>{t("dashboard.cashFlow")}</h3>
-          <PctBadge pct={pctChange(data.period.net, data.previousPeriod.net)} />
+          <PctBadge pct={cashFlowPct} />
         </div>
         <p className="widget-hero">{formatCurrency(data.period.net, currency)}</p>
         <div className="cashflow-bars">
@@ -184,6 +201,14 @@ export default function DashboardWidgets({ data }: DashboardWidgetsProps) {
                     onClick: (_e, item) => {
                       const slice = slices[item.index ?? -1];
                       if (slice?.hasChildren && !slice.direct) setDrill((path) => [...path, slice.id]);
+                    },
+                  },
+                  tooltip: {
+                    callbacks: {
+                      label: (ctx) => {
+                        const name = ctx.label ? `${ctx.label}: ` : "";
+                        return `${name}${formatCurrency(chartNumericValue(ctx.parsed), currency)}`;
+                      },
                     },
                   },
                 },

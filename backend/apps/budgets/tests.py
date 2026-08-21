@@ -95,3 +95,25 @@ class BudgetNestedSpentTests(APITestCase):
         budget.categories.add(self.parent)
         spent = budget.spent_in_period(date(2026, 8, 1), date(2026, 8, 31))
         self.assertEqual(spent, Decimal("20.00"))
+
+    def test_income_refund_on_expense_category_reduces_spent(self):
+        self._expense(self.groceries, "20.00")
+        Transaction.objects.create(
+            user=self.user,
+            type=Transaction.TYPE_INCOME,
+            account=self.account,
+            amount=Decimal("5.00"),
+            category=self.groceries,
+            date=aware(2026, 8, 12),
+            currency_code="RUB",
+        )
+        budget = Budget.objects.create(
+            user=self.user,
+            name="Food",
+            amount=Decimal("200"),
+            start_date="2026-08-01",
+            period=Budget.PERIOD_MONTHLY,
+        )
+        budget.categories.add(self.parent)
+        spent = budget.spent_in_period(date(2026, 8, 1), date(2026, 8, 31))
+        self.assertEqual(spent, Decimal("15.00"))

@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { type Account, type Category, type Tag } from "../api/client";
 import { accountsForSelect } from "../data/queries";
-import CategoryTreePicker from "./CategoryTreePicker";
+import CategorySelect from "./CategorySelect";
 import GlyphIcon from "./GlyphIcon";
 
 interface TransactionFiltersProps {
@@ -101,11 +101,10 @@ export default function TransactionFilters({
       )}
 
       <FilterSection icon="folder" title={t("common.category")} defaultOpen={false}>
-        <CategoryTreePicker
+        <CategorySelect
           categories={categories}
-          mode="single"
-          selectedIds={filters.category ? [Number(filters.category)] : []}
-          onChange={(ids) => setField("category", ids[0] ? String(ids[0]) : "")}
+          selectedId={filters.category ? Number(filters.category) : null}
+          onChange={(id) => setField("category", id ? String(id) : "")}
           allowEmpty
           emptyLabel={t("filters.allCategories")}
         />

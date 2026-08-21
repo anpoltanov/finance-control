@@ -46,7 +46,10 @@ export default function TransactionsPage() {
   return (
     <div>
       <div className="page-header">
-        <h2>{t("transactions.title")}</h2>
+        <div>
+          <h2>{t("transactions.title")}</h2>
+          <p className="muted-text tx-count">{t("transactions.count", { count: transactions.length })}</p>
+        </div>
         <DateRangeNav range={range} />
       </div>
 

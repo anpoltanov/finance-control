@@ -4,7 +4,7 @@ import type { Account, Category, Tag } from "../api/client";
 import { accountsForSelect } from "../data/queries";
 import { filterCategoriesForTransaction } from "../utils/categoryTree";
 import { OUTSIDE, type TransferPicks } from "../utils/transferPicks";
-import CategoryTreePicker from "./CategoryTreePicker";
+import CategorySelect from "./CategorySelect";
 
 export type TxFieldType = "expense" | "income" | "transfer";
 
@@ -126,11 +126,10 @@ export default function TransactionFields({
       {values.type !== "transfer" && (
         <div className="form-group form-group-full">
           <label>{t("common.category")}</label>
-          <CategoryTreePicker
+          <CategorySelect
             categories={filterCategoriesForTransaction(categories, values.type)}
-            mode="single"
-            selectedIds={values.category ? [values.category] : []}
-            onChange={(ids) => onChange({ category: ids[0] ?? null })}
+            selectedId={values.category}
+            onChange={(id) => onChange({ category: id })}
             allowEmpty
             emptyLabel={t("common.none")}
           />
