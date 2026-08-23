@@ -1,6 +1,7 @@
 from django.db.models import Q
 from rest_framework import viewsets
 
+from apps.core.dates import parse_datetime_param
 from apps.ledger.models import Account, Category, Tag, Transaction
 from apps.ledger.serializers import (
     AccountSerializer,
@@ -45,10 +46,12 @@ class TransactionViewSet(UserScopedMixin, viewsets.ModelViewSet):
     def get_queryset(self):
         qs = super().get_queryset()
         params = self.request.query_params
-        if params.get("date_from"):
-            qs = qs.filter(date__gte=params["date_from"])
-        if params.get("date_to"):
-            qs = qs.filter(date__lte=params["date_to"])
+        date_from = parse_datetime_param(params.get("date_from"), field="date_from")
+        date_to = parse_datetime_param(params.get("date_to"), field="date_to")
+        if date_from:
+            qs = qs.filter(date__gte=date_from)
+        if date_to:
+            qs = qs.filter(date__lte=date_to)
         if params.get("account"):
             account_id = params["account"]
             qs = qs.filter(Q(account_id=account_id) | Q(to_account_id=account_id))

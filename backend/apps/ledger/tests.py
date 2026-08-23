@@ -175,3 +175,56 @@ class ClassifyCashFlowUnitTests(APITestCase):
         income, expense = classify_cash_flow(Transaction.TYPE_INCOME, Decimal("3"), None)
         self.assertEqual(income, Decimal("3"))
         self.assertEqual(expense, Decimal("0"))
+
+
+class CrossUserForeignKeyTests(APITestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(username="owner", password="p")
+        self.other = User.objects.create_user(username="other", password="p")
+        self.owner_account = Account.objects.create(user=self.owner, title="Owner cash")
+        self.other_account = Account.objects.create(user=self.other, title="Other cash")
+        self.owner_cat = Category.objects.create(user=self.owner, name="Food", type=Category.TYPE_EXPENSE)
+        self.other_cat = Category.objects.create(user=self.other, name="Food", type=Category.TYPE_EXPENSE)
+        self.client.force_authenticate(self.other)
+
+    def test_cannot_create_transaction_on_another_users_account(self):
+        res = self.client.post(
+            "/api/v1/transactions/",
+            {
+                "type": "expense",
+                "account": self.owner_account.id,
+                "amount": "10.00",
+                "date": "2026-08-18T12:00:00Z",
+                "currency_code": "RUB",
+            },
+            format="json",
+        )
+        self.assertEqual(res.status_code, 400, res.content)
+
+    def test_cannot_set_category_parent_to_another_user(self):
+        res = self.client.post(
+            "/api/v1/categories/",
+            {"name": "Nested", "type": "expense", "parent": self.owner_cat.id},
+            format="json",
+        )
+        self.assertEqual(res.status_code, 400, res.content)
+
+    def test_cannot_create_planned_on_another_users_account(self):
+        res = self.client.post(
+            "/api/v1/planned-transactions/",
+            {
+                "type": "expense",
+                "account": self.owner_account.id,
+                "amount": "10.00",
+                "next_occurrence_date": "2026-10-01",
+                "repeat_rule": "once",
+                "currency_code": "RUB",
+            },
+            format="json",
+        )
+        self.assertEqual(res.status_code, 400, res.content)
+
+    def test_invalid_transaction_date_from_returns_400(self):
+        self.client.force_authenticate(self.owner)
+        res = self.client.get("/api/v1/transactions/", {"date_from": "nope"})
+        self.assertEqual(res.status_code, 400)

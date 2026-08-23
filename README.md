@@ -5,6 +5,7 @@ Self-hosted personal finance web app (PWA) with Django REST API, dedicated Postg
 ## Stack
 
 - **web** — Django + Gunicorn + React PWA (static files via WhiteNoise)
+- **scheduler** — one replica that commits due planned transactions
 - **db** — PostgreSQL 16 (dedicated to this app only)
 
 ## Deploy with Portainer
@@ -18,8 +19,24 @@ Self-hosted personal finance web app (PWA) with Django REST API, dedicated Postg
 7. Create the first user via Portainer console on the **web** container:
 
 ```bash
-python manage.py seed_user --username admin --password 'your-password'
+python manage.py seed_user --username admin --password 'your-strong-password'
 ```
+
+Use a unique strong password. `admin` here is only the login name; Django admin is not installed.
+
+### Proxy (Apache HTTPS on another host) vs direct WAN
+
+| | Apache on another machine (default) | Direct WAN with TLS on this host |
+| --- | --- | --- |
+| `BEHIND_PROXY` | `true` | `false` |
+| `ALLOWED_HOSTS` | public hostname | public hostname |
+| `CSRF_TRUSTED_ORIGINS` / `CORS_ALLOWED_ORIGINS` | `https://your.domain` | `https://your.domain` |
+| `JWT_COOKIE_SECURE` | `true` | `true` |
+| `SECURE_SSL_REDIRECT` | `false` (Apache does HTTPS) | `true` |
+| `USE_HSTS` | `false` (set HSTS on Apache) | `true` |
+| Port publish | `0.0.0.0:8080` on the **LAN**; do not NAT 8080/5432 to the internet | same, behind that host’s TLS terminator |
+
+The app talks HTTP to Gunicorn. Browsers should only see HTTPS at the public hostname. Firewall/NAT must not expose 8080 or Postgres.
 
 ## Local development
 
@@ -30,6 +47,7 @@ cd backend
 python -m venv .venv
 .venv\Scripts\activate   # Windows
 pip install -r requirements.txt
+set DEBUG=true
 set DATABASE_URL=       # empty = SQLite for quick dev
 python manage.py migrate
 python manage.py seed_user --password admin
@@ -53,17 +71,17 @@ Vite dev server proxies `/api` to `http://localhost:8000`.
 - Planned transactions with manual commit and autocommit scheduler
 - WalletApp CSV import with transfer leg pairing
 - Reports with charts; IndexedDB offline cache
-- MCP server for local AI agents (`python -m apps.mcp.server`)
+- Optional MCP server for local AI agents (`python -m apps.mcp.server`)
 
 ## MCP server
 
-Run alongside the stack (or on your workstation pointing at the API):
+Leave `MCP_API_TOKEN` **empty** on the public web container. If you set a token, anyone who sends `Authorization: Bearer <token>` acts as that login user.
+
+Run MCP only on a trusted workstation:
 
 ```bash
 cd backend
 export FINANCE_API_URL=http://localhost:8080/api/v1
-export MCP_API_TOKEN=your-token
+export MCP_API_TOKEN=your-long-random-token
 python -m apps.mcp.server
 ```
-
-Configure the token in `.env` as `MCP_API_TOKEN`.

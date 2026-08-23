@@ -1,14 +1,8 @@
 import logging
 
-from apscheduler.schedulers.background import BackgroundScheduler
-from django.conf import settings
-from django_apscheduler.jobstores import DjangoJobStore
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
-
-scheduler = BackgroundScheduler(timezone=settings.TIME_ZONE)
-scheduler.add_jobstore(DjangoJobStore(), "default")
 
 
 def commit_due_planned_transactions():
@@ -28,19 +22,3 @@ def commit_due_planned_transactions():
         except Exception:
             logger.exception("Failed to autocommit planned transaction %s", planned.pk)
     logger.info("Autocommitted %s planned transactions", count)
-
-
-if not scheduler.running:
-    scheduler.add_job(
-        commit_due_planned_transactions,
-        trigger="cron",
-        hour=1,
-        minute=0,
-        id="commit_planned_transactions",
-        replace_existing=True,
-        max_instances=1,
-    )
-    try:
-        scheduler.start()
-    except Exception:
-        pass

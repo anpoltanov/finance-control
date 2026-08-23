@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone as dt_timezone
 from decimal import Decimal, InvalidOperation
 
+from django.db import transaction
 from django.utils import timezone
 
 from apps.ledger.models import Account, Category, Tag, Transaction
@@ -357,6 +358,11 @@ def _create_transaction(user, **kwargs) -> Transaction | None:
 
 
 def commit_import(user, rows: list[WalletAppRow], resolutions: dict | None = None) -> dict:
+    with transaction.atomic():
+        return _commit_import(user, rows, resolutions)
+
+
+def _commit_import(user, rows: list[WalletAppRow], resolutions: dict | None = None) -> dict:
     preview = preview_import(rows, resolutions)
     created = 0
     skipped = 0

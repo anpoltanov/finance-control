@@ -1,14 +1,25 @@
 from rest_framework import serializers
 
 from apps.ledger.models import Account, Category, Tag, Transaction
+from apps.planning.models import PlannedTransaction
 
 
-def set_many_related_queryset(field, queryset):
-    """DRF wraps many=True PK fields in ManyRelatedField; queryset lives on child_relation."""
+def set_related_queryset(field, queryset):
     field.queryset = queryset
     child = getattr(field, "child_relation", None)
     if child is not None:
         child.queryset = queryset
+
+
+def set_many_related_queryset(field, queryset):
+    """DRF wraps many=True PK fields in ManyRelatedField; queryset lives on child_relation."""
+    set_related_queryset(field, queryset)
+
+
+def user_owned_qs(model, user):
+    if user is not None and getattr(user, "is_authenticated", False):
+        return model.objects.filter(user=user, deleted_at__isnull=True)
+    return model.objects.none()
 
 
 class AccountSerializer(serializers.ModelSerializer):
@@ -42,6 +53,12 @@ class CategorySerializer(serializers.ModelSerializer):
         model = Category
         fields = ["id", "name", "icon", "color", "type", "parent", "priority", "created_at", "updated_at", "version"]
         read_only_fields = ["created_at", "updated_at", "version"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        self.fields["parent"].queryset = user_owned_qs(Category, user)
 
     def validate(self, attrs):
         cat_type = attrs.get("type", getattr(self.instance, "type", Category.TYPE_EXPENSE))
@@ -117,10 +134,11 @@ class TransactionSerializer(serializers.ModelSerializer):
         super().__init__(*args, **kwargs)
         request = self.context.get("request")
         user = getattr(request, "user", None)
-        qs = Tag.objects.none()
-        if user is not None and getattr(user, "is_authenticated", False):
-            qs = Tag.objects.filter(user=user, deleted_at__isnull=True)
-        set_many_related_queryset(self.fields["tag_ids"], qs)
+        set_many_related_queryset(self.fields["tag_ids"], user_owned_qs(Tag, user))
+        self.fields["account"].queryset = user_owned_qs(Account, user)
+        self.fields["to_account"].queryset = user_owned_qs(Account, user)
+        self.fields["category"].queryset = user_owned_qs(Category, user)
+        self.fields["planned_transaction"].queryset = user_owned_qs(PlannedTransaction, user)
 
     def get_tag_names(self, obj):
         return list(obj.tags.values_list("name", flat=True))
