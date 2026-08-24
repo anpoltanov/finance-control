@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 
 
 class Command(BaseCommand):
-    help = "Create initial user for the finance app"
+    help = "Create or update the app login user (not a Django admin/staff account)"
 
     def add_arguments(self, parser):
         parser.add_argument("--username", default="admin")
@@ -14,8 +14,8 @@ class Command(BaseCommand):
         password = options["password"]
         user, created = User.objects.get_or_create(username=username)
         user.set_password(password)
-        user.is_staff = True
-        user.is_superuser = True
+        user.is_staff = False
+        user.is_superuser = False
         user.save()
         action = "Created" if created else "Updated"
         self.stdout.write(self.style.SUCCESS(f"{action} user '{username}'"))

@@ -1,7 +1,9 @@
 import os
+import sys
 from datetime import timedelta
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -9,8 +11,19 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIST = BASE_DIR / "static" / "frontend"
 
-SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-dev-only-change-me")
-DEBUG = os.environ.get("DEBUG", "false").lower() == "true"
+INSECURE_SECRET = "django-insecure-dev-only-change-me"
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() == "true"
+
+
+SECRET_KEY = os.environ.get("SECRET_KEY", INSECURE_SECRET)
+DEBUG = _env_bool("DEBUG", False)
+RUNNING_TESTS = "test" in sys.argv
 
 ALLOWED_HOSTS = [
     h.strip()
@@ -18,8 +31,36 @@ ALLOWED_HOSTS = [
     if h.strip()
 ]
 
+if not DEBUG and not RUNNING_TESTS:
+    if not SECRET_KEY or SECRET_KEY == INSECURE_SECRET:
+        raise ImproperlyConfigured("SECRET_KEY must be set to a strong value when DEBUG is false.")
+    if not ALLOWED_HOSTS or "*" in ALLOWED_HOSTS:
+        raise ImproperlyConfigured("ALLOWED_HOSTS must be an explicit host list when DEBUG is false.")
+
+BEHIND_PROXY = _env_bool("BEHIND_PROXY", True)
+if BEHIND_PROXY:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    USE_X_FORWARDED_HOST = True
+
+if "SECURE_SSL_REDIRECT" in os.environ:
+    SECURE_SSL_REDIRECT = _env_bool("SECURE_SSL_REDIRECT", False)
+else:
+    SECURE_SSL_REDIRECT = not DEBUG and not BEHIND_PROXY
+
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "same-origin"
+X_FRAME_OPTIONS = "DENY"
+
+USE_HSTS = _env_bool("USE_HSTS", default=not DEBUG and not BEHIND_PROXY)
+if USE_HSTS:
+    SECURE_HSTS_SECONDS = int(os.environ.get("SECURE_HSTS_SECONDS", "31536000"))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = _env_bool("SECURE_HSTS_PRELOAD", False)
+
+SESSION_COOKIE_SECURE = _env_bool("SESSION_COOKIE_SECURE", default=not DEBUG)
+CSRF_COOKIE_SECURE = _env_bool("CSRF_COOKIE_SECURE", default=not DEBUG)
+
 INSTALLED_APPS = [
-    "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
@@ -28,6 +69,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "rest_framework",
     "rest_framework_simplejwt",
+    "rest_framework_simplejwt.token_blacklist",
     "django_apscheduler",
     "apps.core",
     "apps.ledger",
@@ -69,7 +111,6 @@ WSGI_APPLICATION = "config.wsgi.application"
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 if DATABASE_URL:
-    # postgresql://user:pass@host:5432/dbname
     import urllib.parse as up
 
     parsed = up.urlparse(DATABASE_URL)
@@ -135,20 +176,44 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "login": "5/min",
+    },
 }
+if RUNNING_TESTS:
+    REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["login"] = "1000/min"
+if DEBUG:
+    REST_FRAMEWORK["DEFAULT_RENDERER_CLASSES"] = [
+        "rest_framework.renderers.JSONRenderer",
+        "rest_framework.renderers.BrowsableAPIRenderer",
+    ]
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(hours=12),
+    "ACCESS_TOKEN_LIFETIME": timedelta(hours=1),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
     "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
 
-JWT_COOKIE_SECURE = os.environ.get("JWT_COOKIE_SECURE", "false").lower() == "true"
+if "JWT_COOKIE_SECURE" in os.environ:
+    JWT_COOKIE_SECURE = _env_bool("JWT_COOKIE_SECURE", True)
+else:
+    JWT_COOKIE_SECURE = not DEBUG
 JWT_COOKIE_HTTPONLY = True
 JWT_COOKIE_SAMESITE = os.environ.get("JWT_COOKIE_SAMESITE", "Lax")
+JWT_COOKIE_PATH = "/"
 
 MCP_API_TOKEN = os.environ.get("MCP_API_TOKEN", "")
+MCP_USERNAME = os.environ.get("MCP_USERNAME", "")
+
+DATA_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
+IMPORT_MAX_BYTES = DATA_UPLOAD_MAX_MEMORY_SIZE
+IMPORT_MAX_ROWS = 20_000
 
 APSCHEDULER_DATETIME_FORMAT = "N H:i:s"
 APSCHEDULER_RUN_NOW_TIMEOUT = 25

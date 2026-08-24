@@ -97,3 +97,21 @@ class ImportThenSyncTests(APITestCase):
         self.assertEqual(res.status_code, 200, res.content)
         self.assertEqual(len(res.data["transactions"]), 2)
         self.assertGreaterEqual(len(res.data["accounts"]), 2)
+
+
+class ImportValidationApiTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="u", password="p")
+        self.client.force_authenticate(self.user)
+
+    def test_invalid_resolutions_json_returns_400(self):
+        res = self.client.post(
+            "/api/v1/import/walletapp/?dry_run=true",
+            {"file_content": SAMPLE_CSV, "resolutions": "{not-json"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, 400, res.content)
+
+    def test_empty_file_returns_400(self):
+        res = self.client.post("/api/v1/import/walletapp/", {}, format="json")
+        self.assertEqual(res.status_code, 400)

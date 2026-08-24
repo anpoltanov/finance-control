@@ -1,16 +1,43 @@
 const BASE = "/api/v1";
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+let refreshInFlight: Promise<boolean> | null = null;
+
+async function tryRefreshSession(): Promise<boolean> {
+  if (refreshInFlight) return refreshInFlight;
+  refreshInFlight = fetch(`${BASE}/auth/refresh/`, { method: "POST", credentials: "include" })
+    .then((res) => res.ok)
+    .catch(() => false)
+    .finally(() => {
+      refreshInFlight = null;
+    });
+  return refreshInFlight;
+}
+
+function isAuthPath(path: string): boolean {
+  return path.startsWith("/auth/login/") || path.startsWith("/auth/refresh/") || path.startsWith("/auth/logout/");
+}
+
+async function request<T>(path: string, options: RequestInit = {}, retried = false): Promise<T> {
+  const headers: Record<string, string> = {
+    ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
+    ...((options.headers as Record<string, string>) || {}),
+  };
+  if (options.body instanceof FormData) {
+    delete headers["Content-Type"];
+  }
   const res = await fetch(`${BASE}${path}`, {
     credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
     ...options,
+    headers,
   });
-  if (res.status === 401) {
+  if (res.status === 401 && !retried && !isAuthPath(path)) {
+    const refreshed = await tryRefreshSession();
+    if (refreshed) return request<T>(path, options, true);
     window.location.href = "/login";
+    throw new Error("Unauthorized");
+  }
+  if (res.status === 401) {
+    if (!isAuthPath(path)) window.location.href = "/login";
     throw new Error("Unauthorized");
   }
   if (!res.ok) {
@@ -253,6 +280,12 @@ export async function importWalletAppCsv(
   }
   const url = `${BASE}/import/walletapp/${dryRun ? "?dry_run=true" : ""}`;
   const res = await fetch(url, { method: "POST", credentials: "include", body: form });
+  if (res.status === 401) {
+    const refreshed = await tryRefreshSession();
+    if (refreshed) return importWalletAppCsv(file, dryRun, resolutions);
+    window.location.href = "/login";
+    throw new Error("Unauthorized");
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.detail || "Import failed");
