@@ -57,6 +57,7 @@ def rotate_or_reuse_refresh(raw: str) -> dict | None:
     """Return {"access", "refresh"} for a valid cookie, including concurrent reuse."""
     key = hash_refresh_token(raw)
     ttl = reuse_ttl()
+    result: dict | None = None
 
     with transaction.atomic():
         reuse, _created = RefreshTokenReuse.objects.select_for_update().get_or_create(
@@ -65,25 +66,28 @@ def rotate_or_reuse_refresh(raw: str) -> dict | None:
         )
         if reuse.refresh:
             if timezone.now() - reuse.created_at > ttl:
-                return None
-            try:
-                token = RefreshToken(reuse.refresh)
-            except TokenError:
-                return None
-            return {"access": str(token.access_token), "refresh": reuse.refresh}
-
-        serializer = TokenRefreshSerializer(data={"refresh": raw})
-        try:
-            if not serializer.is_valid():
                 reuse.delete()
-                return None
-        except TokenError:
-            reuse.delete()
-            return None
+            else:
+                try:
+                    token = RefreshToken(reuse.refresh)
+                    result = {"access": str(token.access_token), "refresh": reuse.refresh}
+                except TokenError:
+                    reuse.delete()
+        else:
+            serializer = TokenRefreshSerializer(data={"refresh": raw})
+            try:
+                if not serializer.is_valid():
+                    reuse.delete()
+                else:
+                    data = serializer.validated_data
+                    new_refresh = data.get("refresh", raw)
+                    reuse.refresh = new_refresh
+                    reuse.save(update_fields=["refresh"])
+                    result = {"access": data["access"], "refresh": new_refresh}
+            except TokenError:
+                reuse.delete()
 
-        data = serializer.validated_data
-        new_refresh = data.get("refresh", raw)
-        reuse.refresh = new_refresh
-        reuse.save(update_fields=["refresh"])
-        RefreshTokenReuse.objects.filter(created_at__lt=timezone.now() - ttl).exclude(pk=key).delete()
-        return {"access": data["access"], "refresh": new_refresh}
+    # Prune after releasing this request's row lock so we never lock parent
+    # then successor (logout) while another transaction holds successor then parent.
+    RefreshTokenReuse.objects.filter(created_at__lt=timezone.now() - ttl).delete()
+    return result
