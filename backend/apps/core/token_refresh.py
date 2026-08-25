@@ -34,6 +34,12 @@ def _blacklist_refresh(raw: str) -> None:
         pass
 
 
+def _store_successor(reuse: RefreshTokenReuse, new_refresh: str) -> None:
+    reuse.refresh = new_refresh
+    reuse.created_at = timezone.now()
+    reuse.save(update_fields=["refresh", "created_at"])
+
+
 def _lock_reuse_row(raw: str) -> RefreshTokenReuse:
     obj, _created = RefreshTokenReuse.objects.select_for_update().get_or_create(
         token_hash=hash_refresh_token(raw),
@@ -72,10 +78,13 @@ def rotate_or_reuse_refresh(raw: str) -> dict | None:
             if timezone.now() - reuse.created_at <= ttl:
                 # logout(successor) only locks the successor key. Hold it before
                 # treating that token as valid so an uncommitted blacklist is waited out.
-                _lock_reuse_row(reuse.refresh)
+                successor = reuse.refresh
+                successor_row = _lock_reuse_row(successor)
                 try:
-                    token = RefreshToken(reuse.refresh)
-                    result = {"access": str(token.access_token), "refresh": reuse.refresh}
+                    token = RefreshToken(successor)
+                    result = {"access": str(token.access_token), "refresh": successor}
+                    if not successor_row.refresh:
+                        successor_row.delete()
                 except TokenError:
                     reuse.delete()
         else:
@@ -86,8 +95,7 @@ def rotate_or_reuse_refresh(raw: str) -> dict | None:
                 else:
                     data = serializer.validated_data
                     new_refresh = data.get("refresh", raw)
-                    reuse.refresh = new_refresh
-                    reuse.save(update_fields=["refresh"])
+                    _store_successor(reuse, new_refresh)
                     result = {"access": data["access"], "refresh": new_refresh}
             except TokenError:
                 reuse.delete()

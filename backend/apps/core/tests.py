@@ -194,6 +194,36 @@ class AuthCookieTests(APITestCase):
         self.assertIsNotNone(data)
         self.assertEqual(locked[:2], [old_refresh, successor])
 
+    def test_successor_lock_placeholder_does_not_poison_reuse_ttl(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from apps.core.models import RefreshTokenReuse
+        from apps.core.token_refresh import hash_refresh_token
+
+        self.client.post("/api/v1/auth/login/", {"username": "u", "password": "p"}, format="json")
+        self.client.post("/api/v1/auth/refresh/")
+        successor = self.client.cookies.get("refresh_token").value
+        RefreshTokenReuse.objects.update_or_create(
+            token_hash=hash_refresh_token(successor),
+            defaults={"refresh": ""},
+        )
+        RefreshTokenReuse.objects.filter(pk=hash_refresh_token(successor)).update(
+            created_at=timezone.now() - timedelta(seconds=31)
+        )
+
+        self.client.cookies["refresh_token"] = successor
+        first = self.client.post("/api/v1/auth/refresh/")
+        self.assertEqual(first.status_code, 200, first.content)
+        rotated = self.client.cookies.get("refresh_token").value
+        self.assertNotEqual(rotated, successor)
+
+        self.client.cookies["refresh_token"] = successor
+        second = self.client.post("/api/v1/auth/refresh/")
+        self.assertEqual(second.status_code, 200, second.content)
+        self.assertEqual(self.client.cookies.get("refresh_token").value, rotated)
+
     def test_reuse_of_blacklisted_successor_returns_401_not_500(self):
         from unittest.mock import patch
 
