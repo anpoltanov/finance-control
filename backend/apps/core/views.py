@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.contrib.auth import authenticate
+from django.db.utils import OperationalError
 from django.utils import timezone
 from rest_framework import permissions, status
 from rest_framework.response import Response
@@ -116,10 +117,13 @@ class LogoutView(APIView):
 
     def post(self, request):
         raw = request.COOKIES.get("refresh_token")
-        if raw:
-            revoke_refresh_cookie(raw)
         response = Response({"detail": "Logged out."})
         clear_jwt_cookies(response)
+        if raw:
+            try:
+                revoke_refresh_cookie(raw)
+            except OperationalError:
+                pass
         return response
 
 
