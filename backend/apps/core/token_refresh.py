@@ -19,14 +19,6 @@ def reuse_ttl() -> timedelta:
     return timedelta(seconds=int(getattr(settings, "JWT_REFRESH_REUSE_SECONDS", 30)))
 
 
-def _refresh_still_valid(raw: str) -> bool:
-    try:
-        RefreshToken(raw)
-        return True
-    except TokenError:
-        return False
-
-
 def rotate_or_reuse_refresh(raw: str) -> dict | None:
     """Return {"access", "refresh"} for a valid cookie, including concurrent reuse."""
     key = hash_refresh_token(raw)
@@ -38,9 +30,12 @@ def rotate_or_reuse_refresh(raw: str) -> dict | None:
             defaults={"refresh": ""},
         )
         if reuse.refresh:
-            if timezone.now() - reuse.created_at > ttl or not _refresh_still_valid(reuse.refresh):
+            if timezone.now() - reuse.created_at > ttl:
                 return None
-            token = RefreshToken(reuse.refresh)
+            try:
+                token = RefreshToken(reuse.refresh)
+            except TokenError:
+                return None
             return {"access": str(token.access_token), "refresh": reuse.refresh}
 
         serializer = TokenRefreshSerializer(data={"refresh": raw})

@@ -104,6 +104,19 @@ class AuthCookieTests(APITestCase):
         res = self.client.post("/api/v1/auth/refresh/")
         self.assertEqual(res.status_code, 401)
 
+    def test_reuse_of_blacklisted_successor_returns_401_not_500(self):
+        from unittest.mock import patch
+
+        from rest_framework_simplejwt.exceptions import TokenError
+
+        self.client.post("/api/v1/auth/login/", {"username": "u", "password": "p"}, format="json")
+        old_refresh = self.client.cookies.get("refresh_token").value
+        self.client.post("/api/v1/auth/refresh/")
+        self.client.cookies["refresh_token"] = old_refresh
+        with patch("apps.core.token_refresh.RefreshToken", side_effect=TokenError("blacklisted")):
+            res = self.client.post("/api/v1/auth/refresh/")
+        self.assertEqual(res.status_code, 401)
+
 
 class LoginThrottleTests(APITestCase):
     def test_login_view_uses_login_throttle(self):
