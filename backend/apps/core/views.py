@@ -4,14 +4,13 @@ from django.utils import timezone
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.budgets.models import Budget
 from apps.budgets.serializers import BudgetSerializer
 from apps.core.dates import parse_datetime_param
 from apps.core.throttles import LoginRateThrottle
-from apps.core.token_refresh import rotate_or_reuse_refresh
+from apps.core.token_refresh import revoke_refresh_cookie, rotate_or_reuse_refresh
 from apps.ledger.models import Account, Category, Tag, Transaction
 from apps.ledger.serializers import (
     AccountSerializer,
@@ -118,10 +117,7 @@ class LogoutView(APIView):
     def post(self, request):
         raw = request.COOKIES.get("refresh_token")
         if raw:
-            try:
-                RefreshToken(raw).blacklist()
-            except (TokenError, AttributeError, Exception):
-                pass
+            revoke_refresh_cookie(raw)
         response = Response({"detail": "Logged out."})
         clear_jwt_cookies(response)
         return response

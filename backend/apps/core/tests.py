@@ -104,6 +104,21 @@ class AuthCookieTests(APITestCase):
         res = self.client.post("/api/v1/auth/refresh/")
         self.assertEqual(res.status_code, 401)
 
+    def test_logout_with_pre_rotation_cookie_revokes_successor(self):
+        self.client.post("/api/v1/auth/login/", {"username": "u", "password": "p"}, format="json")
+        old_refresh = self.client.cookies.get("refresh_token").value
+        self.client.post("/api/v1/auth/refresh/")
+        successor = self.client.cookies.get("refresh_token").value
+        self.assertNotEqual(successor, old_refresh)
+
+        self.client.cookies["refresh_token"] = old_refresh
+        self.client.post("/api/v1/auth/logout/")
+
+        self.client.cookies["refresh_token"] = old_refresh
+        self.assertEqual(self.client.post("/api/v1/auth/refresh/").status_code, 401)
+        self.client.cookies["refresh_token"] = successor
+        self.assertEqual(self.client.post("/api/v1/auth/refresh/").status_code, 401)
+
     def test_reuse_of_blacklisted_successor_returns_401_not_500(self):
         from unittest.mock import patch
 
