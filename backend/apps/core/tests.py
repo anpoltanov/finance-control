@@ -119,6 +119,34 @@ class AuthCookieTests(APITestCase):
         self.client.cookies["refresh_token"] = successor
         self.assertEqual(self.client.post("/api/v1/auth/refresh/").status_code, 401)
 
+    def test_revoke_blacklists_successor_before_deleting_reuse_row(self):
+        from unittest.mock import patch
+
+        from apps.core.models import RefreshTokenReuse
+        from apps.core import token_refresh as tr
+
+        self.client.post("/api/v1/auth/login/", {"username": "u", "password": "p"}, format="json")
+        old_refresh = self.client.cookies.get("refresh_token").value
+        self.client.post("/api/v1/auth/refresh/")
+        successor = self.client.cookies.get("refresh_token").value
+        key = tr.hash_refresh_token(old_refresh)
+        real = tr._blacklist_refresh
+        blacklisted = []
+
+        def spy(raw):
+            if raw == successor:
+                self.assertTrue(RefreshTokenReuse.objects.filter(pk=key).exists())
+            blacklisted.append(raw)
+            return real(raw)
+
+        with patch.object(tr, "_blacklist_refresh", side_effect=spy):
+            tr.revoke_refresh_cookie(old_refresh)
+
+        self.assertIn(successor, blacklisted)
+        self.assertFalse(RefreshTokenReuse.objects.filter(pk=key).exists())
+        self.client.cookies["refresh_token"] = successor
+        self.assertEqual(self.client.post("/api/v1/auth/refresh/").status_code, 401)
+
     def test_reuse_of_blacklisted_successor_returns_401_not_500(self):
         from unittest.mock import patch
 

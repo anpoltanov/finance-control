@@ -19,10 +19,10 @@ def reuse_ttl() -> timedelta:
     return timedelta(seconds=int(getattr(settings, "JWT_REFRESH_REUSE_SECONDS", 30)))
 
 
-def _blacklist_quietly(raw: str) -> None:
+def _blacklist_refresh(raw: str) -> None:
     try:
         RefreshToken(raw).blacklist()
-    except (TokenError, AttributeError, Exception):
+    except TokenError:
         pass
 
 
@@ -30,17 +30,18 @@ def revoke_refresh_cookie(raw: str) -> None:
     """Blacklist the presented cookie and any stored rotation successors."""
     seen: set[str] = set()
     current = raw
-    while current and current not in seen:
-        seen.add(current)
-        _blacklist_quietly(current)
-        key = hash_refresh_token(current)
-        with transaction.atomic():
+    with transaction.atomic():
+        while current and current not in seen:
+            seen.add(current)
+            key = hash_refresh_token(current)
             reuse = RefreshTokenReuse.objects.select_for_update().filter(pk=key).first()
-            if not reuse or not reuse.refresh:
-                break
-            nxt = reuse.refresh
-            reuse.delete()
-        current = nxt
+            successor = reuse.refresh if reuse and reuse.refresh else ""
+            if successor:
+                _blacklist_refresh(successor)
+            _blacklist_refresh(current)
+            if reuse:
+                reuse.delete()
+            current = successor
 
 
 def rotate_or_reuse_refresh(raw: str) -> dict | None:
