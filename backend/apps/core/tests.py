@@ -134,7 +134,8 @@ class AuthCookieTests(APITestCase):
         blacklisted = []
 
         def spy(raw):
-            if raw == successor:
+            if not blacklisted:
+                self.assertEqual(raw, successor)
                 self.assertTrue(RefreshTokenReuse.objects.filter(pk=key).exists())
             blacklisted.append(raw)
             return real(raw)
