@@ -63,17 +63,16 @@ def revoke_refresh_cookie(raw: str) -> None:
 
 def rotate_or_reuse_refresh(raw: str) -> dict | None:
     """Return {"access", "refresh"} for a valid cookie, including concurrent reuse."""
-    key = hash_refresh_token(raw)
     ttl = reuse_ttl()
     result: dict | None = None
 
     with transaction.atomic():
-        reuse, _created = RefreshTokenReuse.objects.select_for_update().get_or_create(
-            token_hash=key,
-            defaults={"refresh": ""},
-        )
+        reuse = _lock_reuse_row(raw)
         if reuse.refresh:
             if timezone.now() - reuse.created_at <= ttl:
+                # logout(successor) only locks the successor key. Hold it before
+                # treating that token as valid so an uncommitted blacklist is waited out.
+                _lock_reuse_row(reuse.refresh)
                 try:
                     token = RefreshToken(reuse.refresh)
                     result = {"access": str(token.access_token), "refresh": reuse.refresh}

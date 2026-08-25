@@ -172,6 +172,28 @@ class AuthCookieTests(APITestCase):
         self.client.cookies["refresh_token"] = successor
         self.assertEqual(self.client.post("/api/v1/auth/refresh/").status_code, 401)
 
+    def test_reuse_locks_successor_row_before_minting(self):
+        from unittest.mock import patch
+
+        from apps.core import token_refresh as tr
+
+        self.client.post("/api/v1/auth/login/", {"username": "u", "password": "p"}, format="json")
+        old_refresh = self.client.cookies.get("refresh_token").value
+        self.client.post("/api/v1/auth/refresh/")
+        successor = self.client.cookies.get("refresh_token").value
+        locked = []
+        real = tr._lock_reuse_row
+
+        def spy(raw):
+            locked.append(raw)
+            return real(raw)
+
+        with patch.object(tr, "_lock_reuse_row", side_effect=spy):
+            data = tr.rotate_or_reuse_refresh(old_refresh)
+
+        self.assertIsNotNone(data)
+        self.assertEqual(locked[:2], [old_refresh, successor])
+
     def test_reuse_of_blacklisted_successor_returns_401_not_500(self):
         from unittest.mock import patch
 
