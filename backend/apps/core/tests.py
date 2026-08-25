@@ -61,6 +61,49 @@ class AuthCookieTests(APITestCase):
         self.assertEqual(res.status_code, 401)
         self.assertEqual(res.data["detail"], "Invalid credentials.")
 
+    def test_second_tab_can_reuse_just_rotated_refresh_cookie(self):
+        self.client.post("/api/v1/auth/login/", {"username": "u", "password": "p"}, format="json")
+        old_refresh = self.client.cookies.get("refresh_token").value
+        first = self.client.post("/api/v1/auth/refresh/")
+        self.assertEqual(first.status_code, 200, first.content)
+        new_refresh = self.client.cookies.get("refresh_token").value
+        self.assertNotEqual(new_refresh, old_refresh)
+
+        self.client.cookies["refresh_token"] = old_refresh
+        second = self.client.post("/api/v1/auth/refresh/")
+        self.assertEqual(second.status_code, 200, second.content)
+        self.assertEqual(self.client.cookies.get("refresh_token").value, new_refresh)
+        me = self.client.get("/api/v1/auth/me/")
+        self.assertEqual(me.status_code, 200)
+
+    def test_rotated_refresh_cookie_is_rejected_after_reuse_window(self):
+        self.client.post("/api/v1/auth/login/", {"username": "u", "password": "p"}, format="json")
+        old_refresh = self.client.cookies.get("refresh_token").value
+        self.client.post("/api/v1/auth/refresh/")
+
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from apps.core.models import RefreshTokenReuse
+        from apps.core.token_refresh import hash_refresh_token
+
+        RefreshTokenReuse.objects.filter(pk=hash_refresh_token(old_refresh)).update(
+            created_at=timezone.now() - timedelta(seconds=31)
+        )
+        self.client.cookies["refresh_token"] = old_refresh
+        res = self.client.post("/api/v1/auth/refresh/")
+        self.assertEqual(res.status_code, 401)
+
+    def test_logout_invalidates_reuse_of_previous_refresh_cookie(self):
+        self.client.post("/api/v1/auth/login/", {"username": "u", "password": "p"}, format="json")
+        old_refresh = self.client.cookies.get("refresh_token").value
+        self.client.post("/api/v1/auth/refresh/")
+        self.client.post("/api/v1/auth/logout/")
+        self.client.cookies["refresh_token"] = old_refresh
+        res = self.client.post("/api/v1/auth/refresh/")
+        self.assertEqual(res.status_code, 401)
+
 
 class LoginThrottleTests(APITestCase):
     def test_login_view_uses_login_throttle(self):

@@ -5,13 +5,13 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
-from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.budgets.models import Budget
 from apps.budgets.serializers import BudgetSerializer
 from apps.core.dates import parse_datetime_param
 from apps.core.throttles import LoginRateThrottle
+from apps.core.token_refresh import rotate_or_reuse_refresh
 from apps.ledger.models import Account, Category, Tag, Transaction
 from apps.ledger.serializers import (
     AccountSerializer,
@@ -103,15 +103,11 @@ class RefreshView(APIView):
         raw = request.COOKIES.get("refresh_token")
         if not raw:
             return Response({"detail": "Refresh token missing."}, status=status.HTTP_401_UNAUTHORIZED)
-        serializer = TokenRefreshSerializer(data={"refresh": raw})
-        try:
-            if not serializer.is_valid():
-                return Response({"detail": "Invalid refresh token."}, status=status.HTTP_401_UNAUTHORIZED)
-        except TokenError:
+        data = rotate_or_reuse_refresh(raw)
+        if data is None:
             return Response({"detail": "Invalid refresh token."}, status=status.HTTP_401_UNAUTHORIZED)
-        data = serializer.validated_data
         response = Response({"detail": "Token refreshed."})
-        set_jwt_cookies_from_strings(response, data["access"], data.get("refresh", raw))
+        set_jwt_cookies_from_strings(response, data["access"], data["refresh"])
         return response
 
 
