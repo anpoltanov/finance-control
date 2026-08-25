@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { api } from "../api/client";
+import { api, apiFetch } from "../api/client";
 import { applySyncPayload, clearLocalCache, flushOutbox, getLastSyncedAt } from "../db/index";
 
 const SYNC_INTERVAL_MS = 60_000;
@@ -9,16 +9,10 @@ export async function runSync(): Promise<void> {
   if (!navigator.onLine) return;
   try {
     await flushOutbox(async (item) => {
-      const res = await fetch(`/api/v1${item.path}`, {
+      const res = await apiFetch(item.path, {
         method: item.method,
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
         body: item.body ? JSON.stringify(item.body) : undefined,
       });
-      if (res.status === 401) {
-        window.location.href = "/login";
-        throw new Error("Unauthorized");
-      }
       if (PERMANENT_FAILURE.has(res.status)) {
         return { drop: true };
       }
