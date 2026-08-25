@@ -19,6 +19,14 @@ def reuse_ttl() -> timedelta:
     return timedelta(seconds=int(getattr(settings, "JWT_REFRESH_REUSE_SECONDS", 30)))
 
 
+def reuse_row_retention() -> timedelta:
+    """Keep parent→successor mappings until the refresh token itself would expire.
+
+    Issuing reused tokens stops after reuse_ttl(); logout still needs the row.
+    """
+    return settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"]
+
+
 def _blacklist_refresh(raw: str) -> None:
     try:
         RefreshToken(raw).blacklist()
@@ -65,9 +73,7 @@ def rotate_or_reuse_refresh(raw: str) -> dict | None:
             defaults={"refresh": ""},
         )
         if reuse.refresh:
-            if timezone.now() - reuse.created_at > ttl:
-                reuse.delete()
-            else:
+            if timezone.now() - reuse.created_at <= ttl:
                 try:
                     token = RefreshToken(reuse.refresh)
                     result = {"access": str(token.access_token), "refresh": reuse.refresh}
@@ -89,5 +95,5 @@ def rotate_or_reuse_refresh(raw: str) -> dict | None:
 
     # Prune after releasing this request's row lock so we never lock parent
     # then successor (logout) while another transaction holds successor then parent.
-    RefreshTokenReuse.objects.filter(created_at__lt=timezone.now() - ttl).delete()
+    RefreshTokenReuse.objects.filter(created_at__lt=timezone.now() - reuse_row_retention()).delete()
     return result
