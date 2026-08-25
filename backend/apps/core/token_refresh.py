@@ -26,6 +26,14 @@ def _blacklist_refresh(raw: str) -> None:
         pass
 
 
+def _lock_reuse_row(raw: str) -> RefreshTokenReuse:
+    obj, _created = RefreshTokenReuse.objects.select_for_update().get_or_create(
+        token_hash=hash_refresh_token(raw),
+        defaults={"refresh": ""},
+    )
+    return obj
+
+
 def revoke_refresh_cookie(raw: str) -> None:
     """Blacklist the presented cookie and any stored rotation successors."""
     seen: set[str] = set()
@@ -33,14 +41,15 @@ def revoke_refresh_cookie(raw: str) -> None:
     with transaction.atomic():
         while current and current not in seen:
             seen.add(current)
-            key = hash_refresh_token(current)
-            reuse = RefreshTokenReuse.objects.select_for_update().filter(pk=key).first()
-            successor = reuse.refresh if reuse and reuse.refresh else ""
+            reuse = _lock_reuse_row(current)
+            successor = reuse.refresh
             if successor:
+                # rotate_or_reuse_refresh(successor) locks this other key, not
+                # the parent row. Hold it until the blacklist commit is visible.
+                _lock_reuse_row(successor)
                 _blacklist_refresh(successor)
             _blacklist_refresh(current)
-            if reuse:
-                reuse.delete()
+            reuse.delete()
             current = successor
 
 
