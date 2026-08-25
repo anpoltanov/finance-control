@@ -17,7 +17,7 @@ function isAuthPath(path: string): boolean {
   return path.startsWith("/auth/login/") || path.startsWith("/auth/refresh/") || path.startsWith("/auth/logout/");
 }
 
-async function request<T>(path: string, options: RequestInit = {}, retried = false): Promise<T> {
+function requestHeaders(options: RequestInit): Record<string, string> {
   const headers: Record<string, string> = {
     ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
     ...((options.headers as Record<string, string>) || {}),
@@ -25,14 +25,23 @@ async function request<T>(path: string, options: RequestInit = {}, retried = fal
   if (options.body instanceof FormData) {
     delete headers["Content-Type"];
   }
+  return headers;
+}
+
+/** Fetch with credentials; refresh the access cookie once on 401, then retry. */
+export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
+  return apiFetchOnce(path, options, false);
+}
+
+async function apiFetchOnce(path: string, options: RequestInit, retried: boolean): Promise<Response> {
   const res = await fetch(`${BASE}${path}`, {
     credentials: "include",
     ...options,
-    headers,
+    headers: requestHeaders(options),
   });
   if (res.status === 401 && !retried && !isAuthPath(path)) {
     const refreshed = await tryRefreshSession();
-    if (refreshed) return request<T>(path, options, true);
+    if (refreshed) return apiFetchOnce(path, options, true);
     window.location.href = "/login";
     throw new Error("Unauthorized");
   }
@@ -40,6 +49,11 @@ async function request<T>(path: string, options: RequestInit = {}, retried = fal
     if (!isAuthPath(path)) window.location.href = "/login";
     throw new Error("Unauthorized");
   }
+  return res;
+}
+
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const res = await apiFetch(path, options);
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.detail || res.statusText);
@@ -278,14 +292,10 @@ export async function importWalletAppCsv(
   if (resolutions) {
     form.append("resolutions", JSON.stringify(resolutions));
   }
-  const url = `${BASE}/import/walletapp/${dryRun ? "?dry_run=true" : ""}`;
-  const res = await fetch(url, { method: "POST", credentials: "include", body: form });
-  if (res.status === 401) {
-    const refreshed = await tryRefreshSession();
-    if (refreshed) return importWalletAppCsv(file, dryRun, resolutions);
-    window.location.href = "/login";
-    throw new Error("Unauthorized");
-  }
+  const res = await apiFetch(`/import/walletapp/${dryRun ? "?dry_run=true" : ""}`, {
+    method: "POST",
+    body: form,
+  });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.detail || "Import failed");
