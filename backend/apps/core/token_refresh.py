@@ -40,46 +40,80 @@ def _store_successor(reuse: RefreshTokenReuse, new_refresh: str) -> None:
     reuse.save(update_fields=["refresh", "created_at"])
 
 
+def _lock_hashes(hashes: set[str]) -> dict[str, RefreshTokenReuse]:
+    """Lock reuse rows in lexicographic key order to avoid AB-BA deadlocks."""
+    locked: dict[str, RefreshTokenReuse] = {}
+    for token_hash in sorted(hashes):
+        obj, _created = RefreshTokenReuse.objects.select_for_update().get_or_create(
+            token_hash=token_hash,
+            defaults={"refresh": ""},
+        )
+        locked[token_hash] = obj
+    return locked
+
+
 def _lock_reuse_row(raw: str) -> RefreshTokenReuse:
-    obj, _created = RefreshTokenReuse.objects.select_for_update().get_or_create(
-        token_hash=hash_refresh_token(raw),
-        defaults={"refresh": ""},
-    )
-    return obj
+    return _lock_hashes({hash_refresh_token(raw)})[hash_refresh_token(raw)]
+
+
+def _related_reuse_hashes(hashes: set[str], presented: str) -> set[str]:
+    needed = set(hashes)
+    rows = list(RefreshTokenReuse.objects.filter(pk__in=hashes))
+    stored = [presented, *[row.refresh for row in rows if row.refresh]]
+    for row in rows:
+        needed.add(row.token_hash)
+        if row.refresh:
+            needed.add(hash_refresh_token(row.refresh))
+    for parent in RefreshTokenReuse.objects.filter(refresh__in=stored):
+        needed.add(parent.token_hash)
+    return needed
 
 
 def revoke_refresh_cookie(raw: str) -> None:
-    """Blacklist the presented cookie and any stored rotation successors."""
-    seen: set[str] = set()
-    current = raw
+    """Blacklist the presented cookie, stored successors, and parent mappings."""
+    presented_hash = hash_refresh_token(raw)
     with transaction.atomic():
-        while current and current not in seen:
-            seen.add(current)
-            reuse = _lock_reuse_row(current)
-            successor = reuse.refresh
-            if successor:
-                # rotate_or_reuse_refresh(successor) locks this other key, not
-                # the parent row. Hold it until the blacklist commit is visible.
-                _lock_reuse_row(successor)
-                _blacklist_refresh(successor)
-            _blacklist_refresh(current)
-            reuse.delete()
-            current = successor
+        hashes = {presented_hash}
+        while True:
+            _lock_hashes(hashes)
+            needed = _related_reuse_hashes(hashes, raw)
+            if needed <= hashes:
+                break
+            hashes = needed
+
+        tokens = {raw}
+        for row in RefreshTokenReuse.objects.filter(pk__in=hashes):
+            if row.refresh:
+                tokens.add(row.refresh)
+        for token in tokens:
+            _blacklist_refresh(token)
+        RefreshTokenReuse.objects.filter(pk__in=hashes).delete()
 
 
 def rotate_or_reuse_refresh(raw: str) -> dict | None:
     """Return {"access", "refresh"} for a valid cookie, including concurrent reuse."""
     ttl = reuse_ttl()
     result: dict | None = None
+    raw_hash = hash_refresh_token(raw)
 
     with transaction.atomic():
-        reuse = _lock_reuse_row(raw)
+        hashes = {raw_hash}
+        locked: dict[str, RefreshTokenReuse] = {}
+        while True:
+            locked = _lock_hashes(hashes)
+            reuse = locked[raw_hash]
+            needed = {raw_hash}
+            if reuse.refresh:
+                needed.add(hash_refresh_token(reuse.refresh))
+            if needed <= hashes:
+                break
+            hashes = needed
+
+        reuse = locked[raw_hash]
         if reuse.refresh:
             if timezone.now() - reuse.created_at <= ttl:
-                # logout(successor) only locks the successor key. Hold it before
-                # treating that token as valid so an uncommitted blacklist is waited out.
                 successor = reuse.refresh
-                successor_row = _lock_reuse_row(successor)
+                successor_row = locked[hash_refresh_token(successor)]
                 try:
                     token = RefreshToken(successor)
                     result = {"access": str(token.access_token), "refresh": successor}
@@ -100,7 +134,6 @@ def rotate_or_reuse_refresh(raw: str) -> dict | None:
             except TokenError:
                 reuse.delete()
 
-    # Prune after releasing this request's row lock so we never lock parent
-    # then successor (logout) while another transaction holds successor then parent.
+    # Prune after releasing row locks so cleanup cannot invert lock order with logout.
     RefreshTokenReuse.objects.filter(created_at__lt=timezone.now() - reuse_row_retention()).delete()
     return result

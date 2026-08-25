@@ -119,6 +119,22 @@ class AuthCookieTests(APITestCase):
         self.client.cookies["refresh_token"] = successor
         self.assertEqual(self.client.post("/api/v1/auth/refresh/").status_code, 401)
 
+    def test_logout_with_successor_deletes_parent_reuse_mapping(self):
+        from apps.core.models import RefreshTokenReuse
+        from apps.core.token_refresh import hash_refresh_token
+
+        self.client.post("/api/v1/auth/login/", {"username": "u", "password": "p"}, format="json")
+        old_refresh = self.client.cookies.get("refresh_token").value
+        self.client.post("/api/v1/auth/refresh/")
+        successor = self.client.cookies.get("refresh_token").value
+        self.assertTrue(RefreshTokenReuse.objects.filter(pk=hash_refresh_token(old_refresh)).exists())
+
+        self.client.cookies["refresh_token"] = successor
+        self.client.post("/api/v1/auth/logout/")
+        self.assertFalse(RefreshTokenReuse.objects.filter(pk=hash_refresh_token(old_refresh)).exists())
+        self.client.cookies["refresh_token"] = old_refresh
+        self.assertEqual(self.client.post("/api/v1/auth/refresh/").status_code, 401)
+
     def test_logout_invalidates_reuse_of_previous_refresh_cookie(self):
         self.client.post("/api/v1/auth/login/", {"username": "u", "password": "p"}, format="json")
         old_refresh = self.client.cookies.get("refresh_token").value
@@ -158,8 +174,7 @@ class AuthCookieTests(APITestCase):
         blacklisted = []
 
         def spy(raw):
-            if not blacklisted:
-                self.assertEqual(raw, successor)
+            if raw == successor:
                 self.assertTrue(RefreshTokenReuse.objects.filter(pk=key).exists())
             blacklisted.append(raw)
             return real(raw)
@@ -181,18 +196,24 @@ class AuthCookieTests(APITestCase):
         old_refresh = self.client.cookies.get("refresh_token").value
         self.client.post("/api/v1/auth/refresh/")
         successor = self.client.cookies.get("refresh_token").value
-        locked = []
-        real = tr._lock_reuse_row
+        calls: list[set[str]] = []
+        real = tr._lock_hashes
 
-        def spy(raw):
-            locked.append(raw)
-            return real(raw)
+        def spy(hashes):
+            calls.append(set(hashes))
+            return real(hashes)
 
-        with patch.object(tr, "_lock_reuse_row", side_effect=spy):
+        with patch.object(tr, "_lock_hashes", side_effect=spy):
             data = tr.rotate_or_reuse_refresh(old_refresh)
 
         self.assertIsNotNone(data)
-        self.assertEqual(locked[:2], [old_refresh, successor])
+        self.assertTrue(
+            any(
+                tr.hash_refresh_token(old_refresh) in locked_hashes
+                and tr.hash_refresh_token(successor) in locked_hashes
+                for locked_hashes in calls
+            )
+        )
 
     def test_successor_lock_placeholder_does_not_poison_reuse_ttl(self):
         from datetime import timedelta
