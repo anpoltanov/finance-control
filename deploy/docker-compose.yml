@@ -28,9 +28,10 @@ services:
     healthcheck:
       # -d required: without it pg_isready uses a DB named like the user ("finance").
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-finance} -d ${POSTGRES_DB:-finance_control}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      interval: 5m
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   web:
     image: ${APP_IMAGE:-ghcr.io/anpoltanov/finance-control}:${APP_TAG:-latest}
@@ -50,10 +51,10 @@ services:
           "-c",
           "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/', timeout=3)",
         ]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 40s
+      interval: 5m
+      timeout: 10s
+      retries: 3
+      start_period: 2m
 
   scheduler:
     image: ${APP_IMAGE:-ghcr.io/anpoltanov/finance-control}:${APP_TAG:-latest}
