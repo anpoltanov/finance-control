@@ -41,6 +41,19 @@ services:
       <<: *app-environment
     ports:
       - "${WEB_BIND:-0.0.0.0}:${WEB_PORT:-8080}:8000"
+    # Migrations run only here (entrypoint). Health means migrate finished and gunicorn is up.
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/', timeout=3)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
 
   scheduler:
     image: ${APP_IMAGE:-ghcr.io/anpoltanov/finance-control}:${APP_TAG:-latest}
@@ -48,11 +61,15 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      web:
+        condition: service_healthy
     environment:
       <<: *app-environment
     entrypoint: ["sh", "-c"]
+    # Do not migrate here — concurrent migrate with web races on django_migrations
+    # (pg_type_typname_nsp_index duplicate key on fresh Postgres).
     command:
-      - python manage.py migrate --noinput && while true; do python manage.py commit_planned; sleep 60; done
+      - while true; do python manage.py commit_planned; sleep 60; done
 
 volumes:
   postgres_data:
