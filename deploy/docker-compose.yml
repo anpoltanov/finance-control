@@ -26,10 +26,13 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-finance}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      # -d required: without it pg_isready uses a DB named like the user ("finance").
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-finance} -d ${POSTGRES_DB:-finance_control}"]
+      interval: 5m
+      timeout: 10s
+      retries: 3
+      start_period: 1m
+      start_interval: 10s
 
   web:
     image: ${APP_IMAGE:-ghcr.io/anpoltanov/finance-control}:${APP_TAG:-latest}
@@ -41,6 +44,19 @@ services:
       <<: *app-environment
     ports:
       - "${WEB_BIND:-0.0.0.0}:${WEB_PORT:-8080}:8000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/', timeout=3)",
+        ]
+      interval: 5m
+      timeout: 10s
+      retries: 3
+      start_period: 2m
+      start_interval: 10s
 
   scheduler:
     image: ${APP_IMAGE:-ghcr.io/anpoltanov/finance-control}:${APP_TAG:-latest}
@@ -48,11 +64,14 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      web:
+        condition: service_healthy
     environment:
       <<: *app-environment
     entrypoint: ["sh", "-c"]
+    # Migrate only in web entrypoint — concurrent migrate races on fresh Postgres.
     command:
-      - python manage.py migrate --noinput && while true; do python manage.py commit_planned; sleep 60; done
+      - while true; do python manage.py commit_planned; sleep 60; done
 
 volumes:
   postgres_data:
