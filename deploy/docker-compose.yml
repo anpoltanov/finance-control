@@ -26,7 +26,8 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-finance}"]
+      # -d required: without it pg_isready uses a DB named like the user ("finance").
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-finance} -d ${POSTGRES_DB:-finance_control}"]
       interval: 10s
       timeout: 5s
       retries: 5
