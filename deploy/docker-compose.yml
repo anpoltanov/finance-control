@@ -41,7 +41,6 @@ services:
       <<: *app-environment
     ports:
       - "${WEB_BIND:-0.0.0.0}:${WEB_PORT:-8080}:8000"
-    # Migrations run only here (entrypoint). Health means migrate finished and gunicorn is up.
     healthcheck:
       test:
         [
@@ -66,8 +65,7 @@ services:
     environment:
       <<: *app-environment
     entrypoint: ["sh", "-c"]
-    # Do not migrate here — concurrent migrate with web races on django_migrations
-    # (pg_type_typname_nsp_index duplicate key on fresh Postgres).
+    # Migrate only in web entrypoint — concurrent migrate races on fresh Postgres.
     command:
       - while true; do python manage.py commit_planned; sleep 60; done
 
