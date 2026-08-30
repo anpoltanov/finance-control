@@ -1,11 +1,20 @@
 from django.contrib.auth.models import User
 from django.core.management import call_command
-from django.test import override_settings
+from django.test import SimpleTestCase, override_settings
 from django.urls import NoReverseMatch, reverse
 from rest_framework.test import APITestCase
 
 from apps.core.throttles import LoginRateThrottle
 from apps.core.views import LoginView
+from config.settings import _parse_host_list
+
+
+class ParseHostListTests(SimpleTestCase):
+    def test_strips_scheme_quotes_and_path(self):
+        self.assertEqual(
+            _parse_host_list('https://finance.example.com, "app.example.com"'),
+            ["finance.example.com", "app.example.com"],
+        )
 
 
 class AdminRemovedTests(APITestCase):

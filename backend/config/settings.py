@@ -1,5 +1,6 @@
 import os
 import sys
+import urllib.parse as up
 from datetime import timedelta
 from pathlib import Path
 
@@ -25,11 +26,23 @@ SECRET_KEY = os.environ.get("SECRET_KEY", INSECURE_SECRET)
 DEBUG = _env_bool("DEBUG", False)
 RUNNING_TESTS = "test" in sys.argv
 
-ALLOWED_HOSTS = [
-    h.strip()
-    for h in os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
-    if h.strip()
-]
+
+def _parse_host_list(raw: str) -> list[str]:
+    """Parse ALLOWED_HOSTS; strip quotes and accidental URL schemes (https://...)."""
+    hosts: list[str] = []
+    for part in raw.split(","):
+        item = part.strip().strip("\"'")
+        if not item:
+            continue
+        if "://" in item:
+            item = up.urlparse(item).hostname or item
+        item = item.split("/")[0].strip().strip("\"'")
+        if item and item not in hosts:
+            hosts.append(item)
+    return hosts
+
+
+ALLOWED_HOSTS = _parse_host_list(os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1"))
 
 if not DEBUG and not RUNNING_TESTS:
     if not SECRET_KEY or SECRET_KEY == INSECURE_SECRET:
@@ -111,8 +124,6 @@ WSGI_APPLICATION = "config.wsgi.application"
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 if DATABASE_URL:
-    import urllib.parse as up
-
     parsed = up.urlparse(DATABASE_URL)
     DATABASES = {
         "default": {
@@ -147,9 +158,10 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [FRONTEND_DIST] if FRONTEND_DIST.exists() else []
+# Vite already content-hashes assets; Django manifest hashing would 404 them.
 STORAGES = {
     "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
     },
 }
 
