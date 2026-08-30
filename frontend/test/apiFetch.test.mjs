@@ -21,6 +21,7 @@ before(async () => {
 afterEach(() => {
   location.href = "";
   globalThis.fetch = originalFetch;
+  if ("navigator" in globalThis) delete globalThis.navigator;
 });
 
 describe("apiFetch session refresh", () => {
@@ -101,6 +102,31 @@ describe("apiFetch session refresh", () => {
     assert.equal(a.status, 200);
     assert.equal(b.status, 200);
     assert.equal(refreshCalls, 1);
+    assert.equal(location.href, "");
+  });
+
+  it("coordinates refresh through navigator.locks when available", async () => {
+    let lockCalls = 0;
+    let resourceHits = 0;
+    globalThis.navigator = {
+      locks: {
+        request: async (_name, callback) => {
+          lockCalls += 1;
+          return callback();
+        },
+      },
+    };
+    globalThis.fetch = async (input) => {
+      const url = String(input);
+      if (url.endsWith("/auth/refresh/")) return jsonResponse(200, { detail: "Token refreshed." });
+      resourceHits += 1;
+      if (resourceHits === 1) return jsonResponse(401, { detail: "Unauthorized" });
+      return jsonResponse(200, { ok: true });
+    };
+
+    const res = await apiFetch("/accounts/");
+    assert.equal(res.status, 200);
+    assert.equal(lockCalls, 1);
     assert.equal(location.href, "");
   });
 });

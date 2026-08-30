@@ -210,6 +210,10 @@ SIMPLE_JWT = {
     "BLACKLIST_AFTER_ROTATION": True,
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
+# Concurrent tabs can POST the same refresh cookie after access expires. The first
+# rotation blacklists that cookie; later requests within this window receive the
+# successor instead of 401.
+JWT_REFRESH_REUSE_SECONDS = int(os.environ.get("JWT_REFRESH_REUSE_SECONDS", "30"))
 
 if "JWT_COOKIE_SECURE" in os.environ:
     JWT_COOKIE_SECURE = _env_bool("JWT_COOKIE_SECURE", True)
