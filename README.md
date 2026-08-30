@@ -29,7 +29,7 @@ Use a unique strong password. `admin` here is only the login name; Django admin 
 | | Apache on another machine (default) | Direct WAN with TLS on this host |
 | --- | --- | --- |
 | `BEHIND_PROXY` | `true` | `false` |
-| `ALLOWED_HOSTS` | public hostname | public hostname |
+| `ALLOWED_HOSTS` | public hostname only (no `https://`) | public hostname only (no `https://`) |
 | `CSRF_TRUSTED_ORIGINS` / `CORS_ALLOWED_ORIGINS` | `https://your.domain` | `https://your.domain` |
 | `JWT_COOKIE_SECURE` | `true` | `true` |
 | `SECURE_SSL_REDIRECT` | `false` (Apache does HTTPS) | `true` |

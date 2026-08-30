@@ -45,12 +45,14 @@ services:
     ports:
       - "${WEB_BIND:-0.0.0.0}:${WEB_PORT:-8080}:8000"
     healthcheck:
+      # TCP only: an HTTP GET to 127.0.0.1 gets DisallowedHost (400) when
+      # ALLOWED_HOSTS is the public hostname.
       test:
         [
           "CMD",
           "python",
           "-c",
-          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/', timeout=3)",
+          "import socket; s=socket.create_connection(('127.0.0.1',8000),3); s.close()",
         ]
       interval: 5m
       timeout: 10s
