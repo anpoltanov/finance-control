@@ -4,6 +4,7 @@ import { type Account, type Category, type Tag } from "../api/client";
 import { accountsForSelect } from "../data/queries";
 import CategorySelect from "./CategorySelect";
 import GlyphIcon from "./GlyphIcon";
+import NumericInput from "./NumericInput";
 
 interface TransactionFiltersProps {
   filters: Record<string, string>;
@@ -121,20 +122,16 @@ export default function TransactionFilters({
 
       <FilterSection icon="payments" title={t("filters.amountRange")} defaultOpen={false}>
         <div className="filter-amount-row">
-          <input
-            type="number"
-            inputMode="decimal"
+          <NumericInput
             placeholder={t("filters.amountMin")}
             value={filters.amount_min || ""}
-            onChange={(e) => setField("amount_min", e.target.value)}
+            onChange={(amount_min) => setField("amount_min", amount_min)}
           />
           <span className="muted-text">–</span>
-          <input
-            type="number"
-            inputMode="decimal"
+          <NumericInput
             placeholder={t("filters.amountMax")}
             value={filters.amount_max || ""}
-            onChange={(e) => setField("amount_max", e.target.value)}
+            onChange={(amount_max) => setField("amount_max", amount_max)}
           />
         </div>
       </FilterSection>

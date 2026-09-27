@@ -5,6 +5,7 @@ import { createAccount, deleteAccount, updateAccount } from "../data/repository"
 import ColorField from "./ColorField";
 import IconPicker from "./IconPicker";
 import ModalForm from "./ModalForm";
+import NumericInput from "./NumericInput";
 
 interface AccountFormModalProps {
   open: boolean;
@@ -86,7 +87,11 @@ export default function AccountFormModal({ open, onClose, onSaved, account }: Ac
         </div>
         <div className="form-group">
           <label>{t("accounts.initialBalance")}</label>
-          <input value={form.initial_balance} onChange={(e) => setForm({ ...form, initial_balance: e.target.value })} />
+          <NumericInput
+            value={form.initial_balance}
+            allowNegative
+            onChange={(initial_balance) => setForm({ ...form, initial_balance })}
+          />
         </div>
         <div className="form-group">
           <label>{t("common.color")}</label>

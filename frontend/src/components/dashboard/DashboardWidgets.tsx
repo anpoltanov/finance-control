@@ -42,9 +42,9 @@ export default function DashboardWidgets({ data }: DashboardWidgetsProps) {
   const parentName = parentId ? data.categories.find((c) => c.id === parentId)?.name : null;
 
   const series = data.balanceSeries;
-  const endBalance = series.values.length ? series.values[series.values.length - 1] : data.currentBalance;
+  const endBalance = series.values.length ? series.values[series.values.length - 1] : data.periodEndBalance;
   const flowMax = Math.max(data.period.income, data.period.expense, 1);
-  const balancePct = pctChange(data.currentBalance, data.previousBalance);
+  const balancePct = pctChange(data.periodEndBalance, data.previousBalance);
   const cashFlowPct = pctChange(data.period.net, data.previousPeriod.net);
   const expensePct = pctChange(data.period.expense, data.previousPeriod.expense);
 
@@ -62,9 +62,9 @@ export default function DashboardWidgets({ data }: DashboardWidgetsProps) {
         <div className="gauge-row">
           <SemiGauge
             label={t("dashboard.totalBalance")}
-            display={formatCurrency(data.currentBalance, currency)}
-            value={data.currentBalance}
-            max={gaugeMax(data.currentBalance, data.previousBalance)}
+            display={formatCurrency(data.periodEndBalance, currency)}
+            value={data.periodEndBalance}
+            max={gaugeMax(data.periodEndBalance, data.previousBalance)}
             color={trendColor(balancePct)}
             pct={balancePct}
           />

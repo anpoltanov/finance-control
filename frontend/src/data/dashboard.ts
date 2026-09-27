@@ -8,6 +8,8 @@ export interface DashboardSnapshot {
   plates: Account[];
   totalsByCurrency: Record<string, number>;
   currentBalance: number;
+  /** Statistical balance at the end of the selected period. */
+  periodEndBalance: number;
   previousBalance: number;
   period: CashFlow;
   previousPeriod: CashFlow;
@@ -223,6 +225,9 @@ export async function loadDashboard(from?: string, to?: string): Promise<Dashboa
   }, {});
   const primaryCurrency = statistical[0]?.currency_code || accounts[0]?.currency_code || "RUB";
   const currentBalance = statistical.reduce((sum, a) => sum + parseFloat(a.balance), 0);
+  const periodEndBalance = hasBoundedRange
+    ? statisticalBalanceAt(accounts, txs, toMs + 1)
+    : currentBalance;
   const previousBalance = statisticalBalanceAt(accounts, txs, prevToMs + 1);
 
   const period = cashFlowFor(txs, byId, categoriesById, fromMs, toMs);
@@ -267,6 +272,7 @@ export async function loadDashboard(from?: string, to?: string): Promise<Dashboa
     plates,
     totalsByCurrency,
     currentBalance,
+    periodEndBalance,
     previousBalance,
     period,
     previousPeriod,

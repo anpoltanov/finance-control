@@ -132,6 +132,7 @@
     "outsideWallet": "Outside wallet",
     "fromAccount": "From account",
     "toAccount": "To account",
+    "swapAccounts": "Swap accounts",
     "bothOutside": "Choose a real account on at least one side."
   },
   "confirm": {
@@ -188,7 +189,8 @@
     "count_one": "{{count}} operation",
     "count_other": "{{count}} operations",
     "recipient": "Recipient",
-    "noTagsYet": "No tags yet"
+    "noTagsYet": "No tags yet",
+    "quickCategories": "Common categories"
   },
   "categoriesPage": {
     "title": "Categories & Tags",
