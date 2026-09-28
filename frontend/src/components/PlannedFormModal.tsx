@@ -6,7 +6,7 @@ import { listAccounts, listCategories, listTags } from "../data/queries";
 import { createPlanned, deletePlanned, updatePlanned } from "../data/repository";
 import { picksFromTransfer, resolveTransferPicks, type TransferPicks } from "../utils/transferPicks";
 import ModalForm from "./ModalForm";
-import TransactionFields, { type TxFieldValues } from "./TransactionFields";
+import TransactionFields, { collectTagPayload, type TxFieldValues } from "./TransactionFields";
 
 interface PlannedFormModalProps {
   open: boolean;
@@ -33,6 +33,8 @@ const empty = (accountId = 0): PlannedFormValues => ({
   recipient: "",
   notes: "",
   tag_ids: [],
+  new_tag_names: [],
+  new_tag_draft: "",
   next_occurrence_date: new Date().toISOString().slice(0, 10),
   repeat_rule: "once",
   autocommit: false,
@@ -51,6 +53,8 @@ function valuesFromPlanned(planned: PlannedTransaction): PlannedFormValues {
     recipient: planned.recipient || "",
     notes: planned.notes || "",
     tag_ids: planned.tag_ids || [],
+    new_tag_names: [],
+    new_tag_draft: "",
     next_occurrence_date: planned.next_occurrence_date,
     repeat_rule: planned.repeat_rule,
     autocommit: planned.autocommit,
@@ -97,7 +101,7 @@ export default function PlannedFormModal({ open, onClose, onSaved, planned }: Pl
       notes: form.notes,
       recipient: form.recipient,
       payment_type: form.payment_type,
-      tag_ids: form.tag_ids,
+      ...collectTagPayload(form, tags),
     };
 
     if (form.type === "transfer") {

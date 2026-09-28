@@ -91,9 +91,13 @@ export async function enrichTransaction(
   const toAccount = tx.to_account ? accs.find((a) => a.id === tx.to_account) : undefined;
   const category = tx.category ? cats.find((c) => c.id === tx.category) : undefined;
   const tagIds = tx.tag_ids || [];
-  const tagNames = tagIds
+  const resolvedNames = tagIds
     .map((id) => allTags.find((t) => t.id === id)?.name)
     .filter((n): n is string => Boolean(n));
+  const incomingNames = tx.tag_names || [];
+  // Keep names that arrived with the record when a new tag has no local id yet.
+  const tagNames =
+    incomingNames.length > resolvedNames.length ? incomingNames : resolvedNames.length ? resolvedNames : incomingNames;
   return {
     ...tx,
     account_title: account?.title,

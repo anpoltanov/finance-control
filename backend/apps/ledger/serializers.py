@@ -1,3 +1,4 @@
+from django.db import IntegrityError
 from rest_framework import serializers
 
 from apps.ledger.models import Account, Category, Tag, Transaction
@@ -20,6 +21,78 @@ def user_owned_qs(model, user):
     if user is not None and getattr(user, "is_authenticated", False):
         return model.objects.filter(user=user, deleted_at__isnull=True)
     return model.objects.none()
+
+
+class TagNameListField(serializers.ListField):
+    """Read tag names from the relation and accept names when creating new tags."""
+
+    child = serializers.CharField(max_length=100, trim_whitespace=True)
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault("required", False)
+        kwargs.setdefault("allow_empty", True)
+        super().__init__(**kwargs)
+
+    def get_attribute(self, instance):
+        manager = getattr(instance, "tags", None)
+        if manager is None:
+            return []
+        if hasattr(manager, "all"):
+            return [tag.name for tag in manager.all()]
+        return list(manager)
+
+
+def get_or_create_tag(user, name: str) -> Tag:
+    cleaned = name.strip()
+    active = Tag.objects.filter(user=user, deleted_at__isnull=True, name__iexact=cleaned).first()
+    if active is not None:
+        return active
+    deleted = Tag.objects.filter(user=user, deleted_at__isnull=False, name__iexact=cleaned).first()
+    if deleted is not None:
+        deleted.deleted_at = None
+        deleted.save(update_fields=["deleted_at", "updated_at", "version"])
+        return deleted
+    try:
+        return Tag.objects.create(user=user, name=cleaned)
+    except IntegrityError:
+        tag = Tag.objects.filter(user=user, name__iexact=cleaned).first()
+        if tag is None:
+            raise
+        if tag.deleted_at is not None:
+            tag.deleted_at = None
+            tag.save(update_fields=["deleted_at", "updated_at", "version"])
+        return tag
+
+
+def pop_tags(validated_data, user, instance=None):
+    """Resolve tag_ids and tag_names into a tag list.
+
+    Returns None when the request did not mention tags, so partial updates keep
+    the current set. An explicit tag_ids list replaces the set; tag_names are
+    created when missing and added to that set.
+    """
+    has_ids = "tags" in validated_data
+    has_names = "tag_names" in validated_data
+    tags = validated_data.pop("tags", None)
+    names = validated_data.pop("tag_names", None)
+    if not has_ids and not has_names:
+        return None
+
+    chosen = {}
+    if has_ids:
+        for tag in tags or []:
+            chosen[tag.pk] = tag
+    elif instance is not None:
+        for tag in instance.tags.all():
+            chosen[tag.pk] = tag
+
+    for raw in names or []:
+        name = (raw or "").strip()
+        if not name:
+            continue
+        tag = get_or_create_tag(user, name)
+        chosen[tag.pk] = tag
+    return list(chosen.values())
 
 
 class AccountSerializer(serializers.ModelSerializer):
@@ -81,7 +154,7 @@ class TransactionSerializer(serializers.ModelSerializer):
     tag_ids = serializers.PrimaryKeyRelatedField(
         source="tags", queryset=Tag.objects.none(), many=True, required=False
     )
-    tag_names = serializers.SerializerMethodField()
+    tag_names = TagNameListField()
     account_title = serializers.CharField(source="account.title", read_only=True)
     to_account_title = serializers.CharField(source="to_account.title", read_only=True, allow_null=True)
     category_name = serializers.CharField(source="category.name", read_only=True, allow_null=True)
@@ -125,7 +198,6 @@ class TransactionSerializer(serializers.ModelSerializer):
             "version",
             "import_source_id",
             "import_pair_id",
-            "tag_names",
             "category_icon",
             "category_color",
         ]
@@ -139,9 +211,6 @@ class TransactionSerializer(serializers.ModelSerializer):
         self.fields["to_account"].queryset = user_owned_qs(Account, user)
         self.fields["category"].queryset = user_owned_qs(Category, user)
         self.fields["planned_transaction"].queryset = user_owned_qs(PlannedTransaction, user)
-
-    def get_tag_names(self, obj):
-        return list(obj.tags.values_list("name", flat=True))
 
     def get_category_color(self, obj):
         cat = obj.category
@@ -181,15 +250,17 @@ class TransactionSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
-        tags = validated_data.pop("tags", [])
-        validated_data["user"] = self.context["request"].user
+        user = self.context["request"].user
+        tags = pop_tags(validated_data, user)
+        validated_data["user"] = user
         tx = super().create(validated_data)
         if tags:
             tx.tags.set(tags)
         return tx
 
     def update(self, instance, validated_data):
-        tags = validated_data.pop("tags", None)
+        user = self.context["request"].user
+        tags = pop_tags(validated_data, user, instance)
         tx = super().update(instance, validated_data)
         if tags is not None:
             tx.tags.set(tags)

@@ -16,6 +16,32 @@ export interface TxFieldValues {
   recipient: string;
   notes: string;
   tag_ids: number[];
+  /** Names typed in this form that do not have an id yet. */
+  new_tag_names: string[];
+  new_tag_draft: string;
+}
+
+export function collectTagPayload(
+  values: Pick<TxFieldValues, "tag_ids" | "new_tag_names" | "new_tag_draft">,
+  tags: Tag[]
+): { tag_ids: number[]; tag_names: string[] } {
+  const ids = (values.tag_ids || []).filter((id) => Number.isFinite(id));
+  const names: string[] = [];
+  const seen = new Set<string>();
+
+  function addName(name: string | undefined) {
+    const trimmed = (name || "").trim();
+    if (!trimmed) return;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    names.push(trimmed);
+  }
+
+  for (const id of ids) addName(tags.find((tag) => tag.id === id)?.name);
+  for (const name of values.new_tag_names || []) addName(name);
+  addName(values.new_tag_draft);
+  return { tag_ids: ids, tag_names: names };
 }
 
 interface TransactionFieldsProps {
@@ -63,6 +89,32 @@ export default function TransactionFields({
     const current = values.tag_ids || [];
     onChange({
       tag_ids: current.includes(tagId) ? current.filter((id) => id !== tagId) : [...current, tagId],
+    });
+  }
+
+  function commitDraftTag() {
+    const name = (values.new_tag_draft || "").trim();
+    if (!name) return;
+    const existing = tags.find((tag) => tag.name.toLowerCase() === name.toLowerCase());
+    if (existing) {
+      const current = values.tag_ids || [];
+      onChange({
+        new_tag_draft: "",
+        tag_ids: current.includes(existing.id) ? current : [...current, existing.id],
+      });
+      return;
+    }
+    const pending = values.new_tag_names || [];
+    if (pending.some((item) => item.toLowerCase() === name.toLowerCase())) {
+      onChange({ new_tag_draft: "" });
+      return;
+    }
+    onChange({ new_tag_draft: "", new_tag_names: [...pending, name] });
+  }
+
+  function removeNewTag(name: string) {
+    onChange({
+      new_tag_names: (values.new_tag_names || []).filter((item) => item !== name),
     });
   }
 
@@ -159,7 +211,36 @@ export default function TransactionFields({
               {tag.name}
             </button>
           ))}
-          {tags.length === 0 && <span className="muted-text">{t("transactions.noTagsYet")}</span>}
+          {(values.new_tag_names || []).map((name) => (
+            <button
+              key={name}
+              type="button"
+              className="tag-chip active"
+              onClick={() => removeNewTag(name)}
+            >
+              {name}
+            </button>
+          ))}
+          {tags.length === 0 && (values.new_tag_names || []).length === 0 && (
+            <span className="muted-text">{t("transactions.noTagsYet")}</span>
+          )}
+        </div>
+        <div className="tag-draft">
+          <input
+            value={values.new_tag_draft || ""}
+            placeholder={t("transactions.newTagPlaceholder")}
+            aria-label={t("transactions.newTagPlaceholder")}
+            onChange={(e) => onChange({ new_tag_draft: e.target.value })}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                commitDraftTag();
+              }
+            }}
+          />
+          <button type="button" className="secondary" onClick={commitDraftTag}>
+            {t("transactions.addTag")}
+          </button>
         </div>
       </div>
     </div>

@@ -190,7 +190,9 @@
     "count_many": "{{count}} операций",
     "count_other": "{{count}} операций",
     "recipient": "Получатель",
-    "noTagsYet": "Тегов пока нет"
+    "noTagsYet": "Тегов пока нет",
+    "newTagPlaceholder": "Новый тег",
+    "addTag": "Добавить тег"
   },
   "categoriesPage": {
     "title": "Категории и теги",

@@ -6,7 +6,7 @@ import { listAccounts, listCategories, listTags } from "../data/queries";
 import { createTransaction, deleteTransaction, updateTransaction } from "../data/repository";
 import { picksFromTransfer, resolveTransferPicks, type TransferPicks } from "../utils/transferPicks";
 import ModalForm from "./ModalForm";
-import TransactionFields, { type TxFieldValues } from "./TransactionFields";
+import TransactionFields, { collectTagPayload, type TxFieldValues } from "./TransactionFields";
 
 export type TransactionFormValues = TxFieldValues & {
   date: string;
@@ -30,6 +30,8 @@ const defaultValues = (initial?: Partial<TransactionFormValues>): TransactionFor
   to_account: null,
   category: null,
   tag_ids: [],
+  new_tag_names: [],
+  new_tag_draft: "",
   ...initial,
 });
 
@@ -42,6 +44,8 @@ function valuesFromTransaction(tx: Transaction): TransactionFormValues {
     recipient: tx.recipient || "",
     notes: tx.notes || "",
     tag_ids: tx.tag_ids || [],
+    new_tag_names: [],
+    new_tag_draft: "",
     date: tx.date.slice(0, 16),
     status: tx.status,
     payment_type: tx.payment_type || "",
@@ -87,9 +91,10 @@ export default function TransactionFormModal({
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError("");
-    const { account: _pickedAccount, ...rest } = form;
+    const { account: _pickedAccount, new_tag_names: _newTagNames, new_tag_draft: _draft, ...rest } = form;
     const payload: Partial<Transaction> = {
       ...rest,
+      ...collectTagPayload(form, tags),
       category: form.category ? Number(form.category) : null,
     };
 

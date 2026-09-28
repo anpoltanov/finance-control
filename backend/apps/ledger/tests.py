@@ -32,6 +32,91 @@ class TransactionTagApiTests(APITestCase):
         )
         self.assertEqual(res.status_code, 201, res.content)
         self.assertEqual(list(res.data["tag_ids"]), [tag.id])
+        self.assertEqual(list(res.data["tag_names"]), ["food"])
+
+    def test_patch_new_tag_name_is_created_and_saved(self):
+        user = User.objects.create_user(username="u2", password="p")
+        self.client.force_authenticate(user)
+        account = Account.objects.create(user=user, title="Sber")
+        created = self.client.post(
+            "/api/v1/transactions/",
+            {
+                "type": "expense",
+                "account": account.id,
+                "amount": "10.00",
+                "date": "2026-08-18T12:00:00Z",
+                "currency_code": "RUB",
+                "tag_ids": [],
+                "tag_names": [],
+            },
+            format="json",
+        )
+        self.assertEqual(created.status_code, 201, created.content)
+        res = self.client.patch(
+            f"/api/v1/transactions/{created.data['id']}/",
+            {"tag_ids": [], "tag_names": ["groceries"]},
+            format="json",
+        )
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(list(res.data["tag_names"]), ["groceries"])
+        self.assertEqual(len(res.data["tag_ids"]), 1)
+        tag = Tag.objects.get(user=user, name="groceries")
+        self.assertEqual(list(res.data["tag_ids"]), [tag.id])
+        self.assertEqual(
+            list(Transaction.objects.get(pk=created.data["id"]).tags.values_list("name", flat=True)),
+            ["groceries"],
+        )
+
+    def test_patch_tag_name_reuses_existing_tag(self):
+        user = User.objects.create_user(username="u3", password="p")
+        self.client.force_authenticate(user)
+        account = Account.objects.create(user=user, title="Sber")
+        tag = Tag.objects.create(user=user, name="food")
+        created = self.client.post(
+            "/api/v1/transactions/",
+            {
+                "type": "expense",
+                "account": account.id,
+                "amount": "10.00",
+                "date": "2026-08-18T12:00:00Z",
+                "currency_code": "RUB",
+            },
+            format="json",
+        )
+        res = self.client.patch(
+            f"/api/v1/transactions/{created.data['id']}/",
+            {"tag_names": ["Food"]},
+            format="json",
+        )
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(list(res.data["tag_ids"]), [tag.id])
+        self.assertEqual(Tag.objects.filter(user=user).count(), 1)
+
+    def test_patch_without_tags_keeps_existing(self):
+        user = User.objects.create_user(username="u4", password="p")
+        self.client.force_authenticate(user)
+        account = Account.objects.create(user=user, title="Sber")
+        tag = Tag.objects.create(user=user, name="food")
+        created = self.client.post(
+            "/api/v1/transactions/",
+            {
+                "type": "expense",
+                "account": account.id,
+                "amount": "10.00",
+                "date": "2026-08-18T12:00:00Z",
+                "currency_code": "RUB",
+                "tag_ids": [tag.id],
+            },
+            format="json",
+        )
+        res = self.client.patch(
+            f"/api/v1/transactions/{created.data['id']}/",
+            {"notes": "only notes"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(list(res.data["tag_ids"]), [tag.id])
+        self.assertEqual(list(res.data["tag_names"]), ["food"])
 
 
 class AccountFlagTests(APITestCase):

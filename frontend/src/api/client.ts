@@ -234,6 +234,7 @@ export interface PlannedTransaction {
   payment_type: string;
   currency_code: string;
   tag_ids?: number[];
+  tag_names?: string[];
   last_committed_at: string | null;
 }
 
