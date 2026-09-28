@@ -299,7 +299,6 @@ export async function createPlanned(data: Partial<PlannedTransaction>): Promise<
     payment_type: data.payment_type || "",
     currency_code: data.currency_code || "RUB",
     tag_ids: data.tag_ids || [],
-    tag_names: data.tag_names || [],
     last_committed_at: null,
   };
   await db.planned.put(local);

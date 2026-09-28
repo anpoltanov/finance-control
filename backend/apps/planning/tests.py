@@ -34,7 +34,7 @@ class PlannedTransactionApiTests(APITestCase):
         self.assertEqual(res.data["notes"], "Ипотека")
         self.assertEqual(list(res.data["tag_ids"]), [self.tag.id])
 
-    def test_patch_new_tag_name(self):
+    def test_patch_selected_tags_round_trip(self):
         created = self.client.post(
             "/api/v1/planned-transactions/",
             {
@@ -44,20 +44,24 @@ class PlannedTransactionApiTests(APITestCase):
                 "repeat_rule": "once",
                 "account": self.account.id,
                 "currency_code": "RUB",
-                "tag_ids": [],
-                "tag_names": [],
             },
             format="json",
         )
         self.assertEqual(created.status_code, 201, created.content)
         res = self.client.patch(
             f"/api/v1/planned-transactions/{created.data['id']}/",
-            {"tag_ids": [], "tag_names": ["ремонт"]},
+            {"tag_ids": [self.tag.id]},
             format="json",
         )
         self.assertEqual(res.status_code, 200, res.content)
-        self.assertEqual(list(res.data["tag_names"]), ["ремонт"])
-        self.assertEqual(len(res.data["tag_ids"]), 1)
+        self.assertEqual(list(res.data["tag_ids"]), [self.tag.id])
+        kept = self.client.patch(
+            f"/api/v1/planned-transactions/{created.data['id']}/",
+            {"notes": "still tagged"},
+            format="json",
+        )
+        self.assertEqual(kept.status_code, 200, kept.content)
+        self.assertEqual(list(kept.data["tag_ids"]), [self.tag.id])
 
     def test_create_planned_without_tags(self):
         payload = {

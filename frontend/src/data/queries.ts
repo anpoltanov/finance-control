@@ -95,9 +95,15 @@ export async function enrichTransaction(
     .map((id) => allTags.find((t) => t.id === id)?.name)
     .filter((n): n is string => Boolean(n));
   const incomingNames = tx.tag_names || [];
-  // Keep names that arrived with the record when a new tag has no local id yet.
+  // When every selected id is known locally, those names are the saved set,
+  // including an empty set after the user turns every chip off. Otherwise keep
+  // names that arrived with the record until the missing tags sync down.
   const tagNames =
-    incomingNames.length > resolvedNames.length ? incomingNames : resolvedNames.length ? resolvedNames : incomingNames;
+    resolvedNames.length === tagIds.length
+      ? resolvedNames
+      : incomingNames.length
+        ? incomingNames
+        : resolvedNames;
   return {
     ...tx,
     account_title: account?.title,

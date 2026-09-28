@@ -6,7 +6,7 @@ import { listAccounts, listCategories, listTags } from "../data/queries";
 import { createTransaction, deleteTransaction, updateTransaction } from "../data/repository";
 import { picksFromTransfer, resolveTransferPicks, type TransferPicks } from "../utils/transferPicks";
 import ModalForm from "./ModalForm";
-import TransactionFields, { collectTagPayload, type TxFieldValues } from "./TransactionFields";
+import TransactionFields, { copyTagIds, type TxFieldValues } from "./TransactionFields";
 
 export type TransactionFormValues = TxFieldValues & {
   date: string;
@@ -17,23 +17,24 @@ export type TransactionFormValues = TxFieldValues & {
   transfer_kind: Transaction["transfer_kind"];
 };
 
-const defaultValues = (initial?: Partial<TransactionFormValues>): TransactionFormValues => ({
-  type: "expense",
-  amount: "",
-  date: new Date().toISOString().slice(0, 16),
-  status: "cleared",
-  notes: "",
-  recipient: "",
-  payment_type: "",
-  currency_code: "RUB",
-  transfer_kind: null,
-  to_account: null,
-  category: null,
-  tag_ids: [],
-  new_tag_names: [],
-  new_tag_draft: "",
-  ...initial,
-});
+const defaultValues = (initial?: Partial<TransactionFormValues>): TransactionFormValues => {
+  const { tag_ids: initialTagIds, ...rest } = initial || {};
+  return {
+    type: "expense",
+    amount: "",
+    date: new Date().toISOString().slice(0, 16),
+    status: "cleared",
+    notes: "",
+    recipient: "",
+    payment_type: "",
+    currency_code: "RUB",
+    transfer_kind: null,
+    to_account: null,
+    category: null,
+    ...rest,
+    tag_ids: copyTagIds(initialTagIds),
+  };
+};
 
 function valuesFromTransaction(tx: Transaction): TransactionFormValues {
   return {
@@ -43,9 +44,7 @@ function valuesFromTransaction(tx: Transaction): TransactionFormValues {
     category: tx.category,
     recipient: tx.recipient || "",
     notes: tx.notes || "",
-    tag_ids: tx.tag_ids || [],
-    new_tag_names: [],
-    new_tag_draft: "",
+    tag_ids: copyTagIds(tx.tag_ids),
     date: tx.date.slice(0, 16),
     status: tx.status,
     payment_type: tx.payment_type || "",
@@ -79,6 +78,7 @@ export default function TransactionFormModal({
   const accounts = useLiveQuery(() => listAccounts(), []) ?? [];
   const categories = useLiveQuery(() => listCategories(), []) ?? [];
   const tags = useLiveQuery(() => listTags(), []) ?? [];
+  const seedKey = open ? String(transaction?.id ?? "new") : "";
 
   useEffect(() => {
     if (!open) return;
@@ -86,15 +86,18 @@ export default function TransactionFormModal({
     setForm(next);
     setPicks(picksFromTransfer(next));
     setError("");
-  }, [open, transaction, initialValues]);
+    // Reseed only when the dialog opens or the edited record changes. A later
+    // refresh of the same record must not wipe chips the user already selected.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seedKey]);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError("");
-    const { account: _pickedAccount, new_tag_names: _newTagNames, new_tag_draft: _draft, ...rest } = form;
+    const { account: _pickedAccount, ...rest } = form;
     const payload: Partial<Transaction> = {
       ...rest,
-      ...collectTagPayload(form, tags),
+      tag_ids: copyTagIds(form.tag_ids),
       category: form.category ? Number(form.category) : null,
     };
 

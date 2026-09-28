@@ -188,9 +188,7 @@
     "count_one": "{{count}} operation",
     "count_other": "{{count}} operations",
     "recipient": "Recipient",
-    "noTagsYet": "No tags yet",
-    "newTagPlaceholder": "New tag",
-    "addTag": "Add tag"
+    "noTagsYet": "No tags yet"
   },
   "categoriesPage": {
     "title": "Categories & Tags",

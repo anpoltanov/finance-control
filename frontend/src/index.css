@@ -886,16 +886,6 @@ label {
   gap: 0.5rem;
 }
 
-.tag-draft {
-  display: flex;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
-}
-
-.tag-draft input {
-  flex: 1;
-}
-
 .tag-chip {
   background: var(--surface2);
   color: var(--text);

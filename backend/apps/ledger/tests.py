@@ -34,10 +34,12 @@ class TransactionTagApiTests(APITestCase):
         self.assertEqual(list(res.data["tag_ids"]), [tag.id])
         self.assertEqual(list(res.data["tag_names"]), ["food"])
 
-    def test_patch_new_tag_name_is_created_and_saved(self):
+    def test_patch_selected_tags_are_saved(self):
         user = User.objects.create_user(username="u2", password="p")
         self.client.force_authenticate(user)
         account = Account.objects.create(user=user, title="Sber")
+        food = Tag.objects.create(user=user, name="food")
+        rent = Tag.objects.create(user=user, name="rent")
         created = self.client.post(
             "/api/v1/transactions/",
             {
@@ -46,28 +48,25 @@ class TransactionTagApiTests(APITestCase):
                 "amount": "10.00",
                 "date": "2026-08-18T12:00:00Z",
                 "currency_code": "RUB",
-                "tag_ids": [],
-                "tag_names": [],
             },
             format="json",
         )
         self.assertEqual(created.status_code, 201, created.content)
+        self.assertEqual(list(created.data["tag_ids"]), [])
         res = self.client.patch(
             f"/api/v1/transactions/{created.data['id']}/",
-            {"tag_ids": [], "tag_names": ["groceries"]},
+            {"tag_ids": [food.id, rent.id]},
             format="json",
         )
         self.assertEqual(res.status_code, 200, res.content)
-        self.assertEqual(list(res.data["tag_names"]), ["groceries"])
-        self.assertEqual(len(res.data["tag_ids"]), 1)
-        tag = Tag.objects.get(user=user, name="groceries")
-        self.assertEqual(list(res.data["tag_ids"]), [tag.id])
+        self.assertEqual(list(res.data["tag_ids"]), [food.id, rent.id])
+        self.assertEqual(list(res.data["tag_names"]), ["food", "rent"])
         self.assertEqual(
             list(Transaction.objects.get(pk=created.data["id"]).tags.values_list("name", flat=True)),
-            ["groceries"],
+            ["food", "rent"],
         )
 
-    def test_patch_tag_name_reuses_existing_tag(self):
+    def test_patch_clears_tags_only_when_ids_are_empty(self):
         user = User.objects.create_user(username="u3", password="p")
         self.client.force_authenticate(user)
         account = Account.objects.create(user=user, title="Sber")
@@ -80,16 +79,18 @@ class TransactionTagApiTests(APITestCase):
                 "amount": "10.00",
                 "date": "2026-08-18T12:00:00Z",
                 "currency_code": "RUB",
+                "tag_ids": [tag.id],
             },
             format="json",
         )
         res = self.client.patch(
             f"/api/v1/transactions/{created.data['id']}/",
-            {"tag_names": ["Food"]},
+            {"tag_ids": [], "tag_names": ["food"]},
             format="json",
         )
         self.assertEqual(res.status_code, 200, res.content)
-        self.assertEqual(list(res.data["tag_ids"]), [tag.id])
+        self.assertEqual(list(res.data["tag_ids"]), [])
+        self.assertEqual(list(res.data["tag_names"]), [])
         self.assertEqual(Tag.objects.filter(user=user).count(), 1)
 
     def test_patch_without_tags_keeps_existing(self):

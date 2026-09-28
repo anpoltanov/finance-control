@@ -6,7 +6,7 @@ import { listAccounts, listCategories, listTags } from "../data/queries";
 import { createPlanned, deletePlanned, updatePlanned } from "../data/repository";
 import { picksFromTransfer, resolveTransferPicks, type TransferPicks } from "../utils/transferPicks";
 import ModalForm from "./ModalForm";
-import TransactionFields, { collectTagPayload, type TxFieldValues } from "./TransactionFields";
+import TransactionFields, { copyTagIds, type TxFieldValues } from "./TransactionFields";
 
 interface PlannedFormModalProps {
   open: boolean;
@@ -32,9 +32,7 @@ const empty = (accountId = 0): PlannedFormValues => ({
   category: null,
   recipient: "",
   notes: "",
-  tag_ids: [],
-  new_tag_names: [],
-  new_tag_draft: "",
+  tag_ids: copyTagIds(),
   next_occurrence_date: new Date().toISOString().slice(0, 10),
   repeat_rule: "once",
   autocommit: false,
@@ -52,9 +50,7 @@ function valuesFromPlanned(planned: PlannedTransaction): PlannedFormValues {
     category: planned.category,
     recipient: planned.recipient || "",
     notes: planned.notes || "",
-    tag_ids: planned.tag_ids || [],
-    new_tag_names: [],
-    new_tag_draft: "",
+    tag_ids: copyTagIds(planned.tag_ids),
     next_occurrence_date: planned.next_occurrence_date,
     repeat_rule: planned.repeat_rule,
     autocommit: planned.autocommit,
@@ -73,6 +69,7 @@ export default function PlannedFormModal({ open, onClose, onSaved, planned }: Pl
   const accounts = useLiveQuery(() => listAccounts(), []) ?? [];
   const categories = useLiveQuery(() => listCategories(), []) ?? [];
   const tags = useLiveQuery(() => listTags(), []) ?? [];
+  const seedKey = open ? String(planned?.id ?? "new") : "";
 
   useEffect(() => {
     if (!open) return;
@@ -80,7 +77,9 @@ export default function PlannedFormModal({ open, onClose, onSaved, planned }: Pl
     setForm(next);
     setPicks(picksFromTransfer(next));
     setError("");
-  }, [open, planned]);
+    // Reseed only when the dialog opens or the edited record changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seedKey]);
 
   useEffect(() => {
     if (!open || planned || form.account) return;
@@ -101,7 +100,7 @@ export default function PlannedFormModal({ open, onClose, onSaved, planned }: Pl
       notes: form.notes,
       recipient: form.recipient,
       payment_type: form.payment_type,
-      ...collectTagPayload(form, tags),
+      tag_ids: copyTagIds(form.tag_ids),
     };
 
     if (form.type === "transfer") {
