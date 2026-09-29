@@ -91,9 +91,19 @@ export async function enrichTransaction(
   const toAccount = tx.to_account ? accs.find((a) => a.id === tx.to_account) : undefined;
   const category = tx.category ? cats.find((c) => c.id === tx.category) : undefined;
   const tagIds = tx.tag_ids || [];
-  const tagNames = tagIds
+  const resolvedNames = tagIds
     .map((id) => allTags.find((t) => t.id === id)?.name)
     .filter((n): n is string => Boolean(n));
+  const incomingNames = tx.tag_names || [];
+  // When every selected id is known locally, those names are the saved set,
+  // including an empty set after the user turns every chip off. Otherwise keep
+  // names that arrived with the record until the missing tags sync down.
+  const tagNames =
+    resolvedNames.length === tagIds.length
+      ? resolvedNames
+      : incomingNames.length
+        ? incomingNames
+        : resolvedNames;
   return {
     ...tx,
     account_title: account?.title,

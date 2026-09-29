@@ -3,6 +3,19 @@ import { db, nextTempId, queueOutbox } from "../db";
 import { enrichTransaction } from "./queries";
 import { computeBudgetStatus } from "./reports";
 
+async function rememberTags(record: { tag_ids?: number[]; tag_names?: string[] } | null | undefined) {
+  const ids = record?.tag_ids || [];
+  const names = record?.tag_names || [];
+  await Promise.all(
+    ids.map(async (id, index) => {
+      const name = names[index];
+      if (!id || id < 0 || !name) return;
+      const existing = await db.tags.get(id);
+      if (!existing) await db.tags.put({ id, name, color: "#94a3b8" });
+    })
+  );
+}
+
 async function tryOnline<T>(fn: () => Promise<T>): Promise<{ ok: true; value: T } | { ok: false }> {
   if (!navigator.onLine) return { ok: false };
   try {
@@ -150,6 +163,7 @@ export async function deleteTag(id: number): Promise<void> {
 export async function createTransaction(data: Partial<Transaction>): Promise<Transaction> {
   const online = await tryOnline(() => api.transactions.create(data));
   if (online.ok) {
+    await rememberTags(online.value);
     const enriched = await enrichTransaction(online.value);
     await db.transactions.put(enriched);
     return enriched;
@@ -170,6 +184,7 @@ export async function createTransaction(data: Partial<Transaction>): Promise<Tra
     payment_type: data.payment_type || "",
     currency_code: data.currency_code || "RUB",
     tag_ids: data.tag_ids || [],
+    tag_names: data.tag_names || [],
   });
   await db.transactions.put(local);
   await queueOutbox({ method: "POST", path: "/transactions/", body: data, localId: id, entity: "transactions" });
@@ -182,6 +197,7 @@ export async function updateTransaction(id: number, data: Partial<Transaction>):
   await db.transactions.put(merged);
   const online = await tryOnline(() => api.transactions.update(id, data));
   if (online.ok) {
+    await rememberTags(online.value);
     const enriched = await enrichTransaction(online.value);
     await db.transactions.put(enriched);
     return enriched;
@@ -261,6 +277,7 @@ export async function deleteBudget(id: number): Promise<void> {
 export async function createPlanned(data: Partial<PlannedTransaction>): Promise<PlannedTransaction> {
   const online = await tryOnline(() => api.planned.create(data));
   if (online.ok) {
+    await rememberTags(online.value);
     await db.planned.put(online.value);
     return online.value;
   }
@@ -295,6 +312,7 @@ export async function updatePlanned(id: number, data: Partial<PlannedTransaction
   await db.planned.put(merged);
   const online = await tryOnline(() => api.planned.update(id, data));
   if (online.ok) {
+    await rememberTags(online.value);
     await db.planned.put(online.value);
     return online.value;
   }

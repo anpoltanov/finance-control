@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from apps.ledger.models import Account, Category, Tag, Transaction
-from apps.ledger.serializers import set_many_related_queryset, user_owned_qs
+from apps.ledger.serializers import assign_tags, set_many_related_queryset, user_owned_qs
 from apps.planning.models import PlannedTransaction
 
 
@@ -58,13 +58,14 @@ class PlannedTransactionSerializer(serializers.ModelSerializer):
         tags = validated_data.pop("tags", [])
         validated_data["user"] = self.context["request"].user
         obj = super().create(validated_data)
-        if tags:
-            obj.tags.set(tags)
+        assign_tags(obj, tags)
         return obj
 
     def update(self, instance, validated_data):
-        tags = validated_data.pop("tags", None)
+        if "tags" in validated_data:
+            tags = validated_data.pop("tags")
+        else:
+            tags = None
         obj = super().update(instance, validated_data)
-        if tags is not None:
-            obj.tags.set(tags)
+        assign_tags(obj, tags)
         return obj
