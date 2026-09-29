@@ -22,6 +22,16 @@ def user_owned_qs(model, user):
     return model.objects.none()
 
 
+def assign_tags(instance, tags):
+    """Replace the tag set and drop a stale prefetch so the response lists it."""
+    if tags is None:
+        return
+    instance.tags.set(list(tags))
+    cache = getattr(instance, "_prefetched_objects_cache", None)
+    if isinstance(cache, dict):
+        cache.pop("tags", None)
+
+
 class AccountSerializer(serializers.ModelSerializer):
     balance = serializers.SerializerMethodField()
 
@@ -141,7 +151,7 @@ class TransactionSerializer(serializers.ModelSerializer):
         self.fields["planned_transaction"].queryset = user_owned_qs(PlannedTransaction, user)
 
     def get_tag_names(self, obj):
-        return list(obj.tags.values_list("name", flat=True))
+        return [tag.name for tag in obj.tags.all()]
 
     def get_category_color(self, obj):
         cat = obj.category
@@ -184,13 +194,14 @@ class TransactionSerializer(serializers.ModelSerializer):
         tags = validated_data.pop("tags", [])
         validated_data["user"] = self.context["request"].user
         tx = super().create(validated_data)
-        if tags:
-            tx.tags.set(tags)
+        assign_tags(tx, tags)
         return tx
 
     def update(self, instance, validated_data):
-        tags = validated_data.pop("tags", None)
+        if "tags" in validated_data:
+            tags = validated_data.pop("tags")
+        else:
+            tags = None
         tx = super().update(instance, validated_data)
-        if tags is not None:
-            tx.tags.set(tags)
+        assign_tags(tx, tags)
         return tx

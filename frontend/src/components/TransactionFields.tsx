@@ -18,6 +18,18 @@ export interface TxFieldValues {
   tag_ids: number[];
 }
 
+export function copyTagIds(ids?: Array<number | string> | null): number[] {
+  const seen = new Set<number>();
+  const copied: number[] = [];
+  for (const raw of ids || []) {
+    const id = Number(raw);
+    if (!Number.isFinite(id) || seen.has(id)) continue;
+    seen.add(id);
+    copied.push(id);
+  }
+  return copied;
+}
+
 interface TransactionFieldsProps {
   values: TxFieldValues;
   onChange: (patch: Partial<TxFieldValues>) => void;
@@ -60,11 +72,14 @@ export default function TransactionFields({
   }
 
   function toggleTag(tagId: number) {
-    const current = values.tag_ids || [];
+    const id = Number(tagId);
+    const current = copyTagIds(values.tag_ids);
     onChange({
-      tag_ids: current.includes(tagId) ? current.filter((id) => id !== tagId) : [...current, tagId],
+      tag_ids: current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
     });
   }
+
+  const selectedTagIds = new Set(copyTagIds(values.tag_ids));
 
   function accountOptions(excludeId?: string, keepId?: number | null) {
     return accountsForSelect(accounts, [keepId, excludeId ? Number(excludeId) : undefined])
@@ -153,7 +168,7 @@ export default function TransactionFields({
             <button
               key={tag.id}
               type="button"
-              className={`tag-chip${(values.tag_ids || []).includes(tag.id) ? " active" : ""}`}
+              className={`tag-chip${selectedTagIds.has(Number(tag.id)) ? " active" : ""}`}
               onClick={() => toggleTag(tag.id)}
             >
               {tag.name}
