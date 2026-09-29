@@ -6,6 +6,7 @@ import { listCategories } from "../data/queries";
 import { createBudget, updateBudget } from "../data/repository";
 import CategoryTreePicker from "./CategoryTreePicker";
 import ModalForm from "./ModalForm";
+import NumericInput from "./NumericInput";
 
 interface BudgetFormModalProps {
   open: boolean;
@@ -72,7 +73,7 @@ export default function BudgetFormModal({ open, onClose, onSaved, budget }: Budg
         </div>
         <div className="form-group">
           <label>{t("common.amount")}</label>
-          <input value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required />
+          <NumericInput value={form.amount} onChange={(amount) => setForm({ ...form, amount })} required />
         </div>
         <div className="form-group">
           <label>{t("budgets.startDate")}</label>

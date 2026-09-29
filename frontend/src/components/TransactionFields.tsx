@@ -1,10 +1,15 @@
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
+import { useLiveQuery } from "dexie-react-hooks";
 import { useTranslation } from "react-i18next";
 import type { Account, Category, Tag } from "../api/client";
 import { accountsForSelect } from "../data/queries";
+import { db } from "../db";
 import { filterCategoriesForTransaction } from "../utils/categoryTree";
+import { quickCategories } from "../utils/quickCategories";
 import { OUTSIDE, type TransferPicks } from "../utils/transferPicks";
 import CategorySelect from "./CategorySelect";
+import GlyphIcon from "./GlyphIcon";
+import NumericInput from "./NumericInput";
 
 export type TxFieldType = "expense" | "income" | "transfer";
 
@@ -60,6 +65,17 @@ export default function TransactionFields({
 }: TransactionFieldsProps) {
   const { t } = useTranslation();
   const { fromPick, toPick } = picks;
+  const categoryUsage = useLiveQuery(async () => {
+    if (values.type === "transfer") return [] as number[];
+    const txs = await db.transactions.where("type").equals(values.type).toArray();
+    return txs.map((tx) => tx.category).filter((id): id is number => id != null);
+  }, [values.type]) ?? [];
+  const categoryChoices = filterCategoriesForTransaction(categories, values.type);
+  const quick = useMemo(() => {
+    if (values.type === "transfer") return [];
+    const pool = categories.filter((category) => category.type === values.type);
+    return quickCategories(pool, categoryUsage, values.category);
+  }, [categories, categoryUsage, values.category, values.type]);
 
   function changeType(type: TxFieldType) {
     onChange({ type });
@@ -79,6 +95,9 @@ export default function TransactionFields({
     });
   }
 
+  function swapAccounts() {
+    onPicksChange({ fromPick: toPick, toPick: fromPick });
+  }
   const selectedTagIds = new Set(copyTagIds(values.tag_ids));
 
   function accountOptions(excludeId?: string, keepId?: number | null) {
@@ -101,10 +120,10 @@ export default function TransactionFields({
       </div>
       <div className="form-group">
         <label>{t("common.amount")}</label>
-        <input value={values.amount} onChange={(e) => onChange({ amount: e.target.value })} required />
+        <NumericInput value={values.amount} onChange={(amount) => onChange({ amount })} required />
       </div>
       {values.type === "transfer" ? (
-        <>
+        <div className="transfer-account-row">
           <div className="form-group">
             <label>{t("transfer.fromAccount")}</label>
             <select value={fromPick} onChange={(e) => onPicksChange({ fromPick: e.target.value })} required>
@@ -113,6 +132,15 @@ export default function TransactionFields({
               {accountOptions(toPick === OUTSIDE ? undefined : toPick, fromPick && fromPick !== OUTSIDE ? Number(fromPick) : undefined)}
             </select>
           </div>
+          <button
+            type="button"
+            className="secondary swap-accounts"
+            onClick={swapAccounts}
+            aria-label={t("transfer.swapAccounts")}
+            title={t("transfer.swapAccounts")}
+          >
+            <GlyphIcon icon="swap_horiz" />
+          </button>
           <div className="form-group">
             <label>{t("transfer.toAccount")}</label>
             <select value={toPick} onChange={(e) => onPicksChange({ toPick: e.target.value })} required>
@@ -121,7 +149,7 @@ export default function TransactionFields({
               {accountOptions(fromPick === OUTSIDE ? undefined : fromPick, toPick && toPick !== OUTSIDE ? Number(toPick) : undefined)}
             </select>
           </div>
-        </>
+        </div>
       ) : (
         <div className="form-group">
           <label>{t("common.account")}</label>
@@ -141,8 +169,28 @@ export default function TransactionFields({
       {values.type !== "transfer" && (
         <div className="form-group form-group-full">
           <label>{t("common.category")}</label>
+          {quick.length > 0 && (
+            <div className="quick-categories" role="listbox" aria-label={t("transactions.quickCategories")}>
+              {quick.map((category) => {
+                const selected = values.category === category.id;
+                return (
+                  <button
+                    key={category.id}
+                    type="button"
+                    role="option"
+                    aria-selected={selected}
+                    className={`quick-category${selected ? " active" : ""}`}
+                    onClick={() => onChange({ category: category.id })}
+                  >
+                    <GlyphIcon icon={category.icon} fallback="folder" />
+                    <span className="quick-category-name">{category.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <CategorySelect
-            categories={filterCategoriesForTransaction(categories, values.type)}
+            categories={categoryChoices}
             selectedId={values.category}
             onChange={(id) => onChange({ category: id })}
             allowEmpty

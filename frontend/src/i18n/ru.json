@@ -132,6 +132,7 @@
     "outsideWallet": "Вне кошелька",
     "fromAccount": "Со счёта",
     "toAccount": "На счёт",
+    "swapAccounts": "Поменять счета",
     "bothOutside": "Выберите реальный счёт хотя бы с одной стороны."
   },
   "confirm": {
@@ -190,7 +191,8 @@
     "count_many": "{{count}} операций",
     "count_other": "{{count}} операций",
     "recipient": "Получатель",
-    "noTagsYet": "Тегов пока нет"
+    "noTagsYet": "Тегов пока нет",
+    "quickCategories": "Частые категории"
   },
   "categoriesPage": {
     "title": "Категории и теги",

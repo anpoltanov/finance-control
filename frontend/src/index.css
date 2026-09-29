@@ -121,13 +121,18 @@ label {
 }
 
 .form-group {
-  margin-bottom: 1rem;
+  margin-bottom: 0.65rem;
 }
 
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1rem;
+  gap: 0.45rem 0.75rem;
+}
+
+.form-grid > .form-group,
+.form-grid > .transfer-account-row {
+  margin-bottom: 0;
 }
 
 .form-group-full {
@@ -823,7 +828,7 @@ label {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
+  padding: 0.5rem;
   z-index: 1000;
 }
 
@@ -832,7 +837,7 @@ label {
   border-radius: var(--radius);
   width: 100%;
   max-width: 480px;
-  max-height: 90vh;
+  max-height: calc(100dvh - 1rem);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -846,7 +851,7 @@ label {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem 1.25rem;
+  padding: 0.55rem 0.9rem;
   border-bottom: 1px solid var(--surface2);
 }
 
@@ -862,17 +867,32 @@ label {
 }
 
 .modal-body {
-  padding: 1.25rem;
+  padding: 0.65rem 0.9rem 0.7rem;
   overflow-y: auto;
+}
+
+.modal-dialog input,
+.modal-dialog select,
+.modal-dialog textarea,
+.modal-dialog .category-select-trigger {
+  padding: 0.38rem 0.6rem;
+}
+
+.modal-dialog label {
+  margin-bottom: 0.12rem;
 }
 
 .modal-footer {
   display: flex;
   justify-content: flex-end;
-  gap: 0.5rem;
-  margin-top: 1rem;
-  padding-top: 1rem;
+  gap: 0.45rem;
+  margin-top: 0.4rem;
+  padding-top: 0.4rem;
   border-top: 1px solid var(--surface2);
+}
+
+.modal-footer button {
+  padding: 0.38rem 0.8rem;
 }
 
 .modal-footer-delete {
@@ -1044,9 +1064,76 @@ td {
 }
 
 .field-hint {
-  margin: 0 0 0.65rem;
-  font-size: 0.8rem;
+  margin: 0 0 0.35rem;
+  font-size: 0.75rem;
   color: var(--muted);
+}
+
+.transfer-account-row {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 0.4rem;
+  align-items: end;
+}
+
+.transfer-account-row > .form-group {
+  margin-bottom: 0;
+}
+
+.swap-accounts {
+  width: 2.05rem;
+  height: 2.05rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.swap-accounts .material-symbols-outlined {
+  font-size: 1.2rem;
+}
+
+.quick-categories {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.35rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  margin-bottom: 0.35rem;
+  padding-bottom: 0.1rem;
+  scrollbar-width: thin;
+}
+
+.quick-category {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  max-width: 11rem;
+  padding: 0.2rem 0.55rem;
+  background: var(--surface2);
+  color: var(--text);
+  border-radius: 999px;
+  font-size: 0.78rem;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.quick-category .material-symbols-outlined,
+.quick-category .glyph-fallback {
+  font-size: 0.95rem;
+}
+
+.quick-category.active {
+  background: var(--primary);
+  color: var(--primary-text);
+}
+
+.quick-category-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .form-checks .filter-checkbox {
@@ -1473,6 +1560,81 @@ td {
 
 .cashflow-fill.expense {
   background: var(--danger);
+}
+
+@media (max-height: 820px) {
+  .modal-overlay {
+    padding: 0.3rem;
+    align-items: flex-start;
+  }
+
+  .modal-dialog {
+    max-height: calc(100dvh - 0.6rem);
+  }
+
+  .modal-header {
+    padding: 0.3rem 0.7rem;
+  }
+
+  .modal-header h2 {
+    font-size: 1rem;
+  }
+
+  .modal-body {
+    padding: 0.4rem 0.7rem 0.45rem;
+  }
+
+  .modal-dialog label {
+    margin-bottom: 0.05rem;
+    font-size: 0.72rem;
+  }
+
+  .modal-dialog input,
+  .modal-dialog select,
+  .modal-dialog textarea,
+  .modal-dialog .category-select-trigger {
+    padding: 0.26rem 0.5rem;
+  }
+
+  .modal-footer {
+    margin-top: 0.28rem;
+    padding-top: 0.28rem;
+    gap: 0.35rem;
+  }
+
+  .modal-footer button {
+    padding: 0.28rem 0.65rem;
+  }
+
+  .form-grid {
+    gap: 0.28rem 0.55rem;
+  }
+
+  .icon-picker {
+    max-height: 5.75rem;
+    padding: 0.2rem;
+  }
+
+  .tag-chip {
+    padding: 0.16rem 0.5rem;
+  }
+
+  .field-hint {
+    margin-bottom: 0.2rem;
+  }
+
+  .quick-categories {
+    margin-bottom: 0.2rem;
+  }
+
+  .quick-category {
+    padding: 0.12rem 0.45rem;
+  }
+
+  .swap-accounts {
+    width: 1.85rem;
+    height: 1.85rem;
+  }
 }
 
 @media (max-width: 768px) {
