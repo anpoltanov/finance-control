@@ -1,6 +1,6 @@
 import type { Account, Category, Tag, Transaction } from "../api/client";
 import { db } from "../db";
-import { resolveCategoryColor } from "../utils/categoryTree";
+import { categoryFilterIds, resolveCategoryColor } from "../utils/categoryTree";
 
 export interface TransactionFilters {
   account?: string | number;
@@ -13,6 +13,10 @@ export interface TransactionFilters {
   amount_min?: string | number;
   amount_max?: string | number;
   hide_transfers?: string | boolean;
+  /** When set, the category filter matches that category only, not its descendants. */
+  category_exact?: string | boolean;
+  /** Transactions with no category, or a category id that is not in the local tree. */
+  uncategorized?: string | boolean;
   sort?: "date_desc" | "date_asc" | "amount_desc" | "amount_asc";
 }
 
@@ -128,9 +132,14 @@ export async function listTransactions(filters: TransactionFilters = {}): Promis
     const accountId = Number(filters.account);
     txs = txs.filter((tx) => tx.account === accountId || tx.to_account === accountId);
   }
-  if (filters.category) {
+  if (filters.uncategorized === true || filters.uncategorized === "1" || filters.uncategorized === "true") {
+    const known = new Set(categories.map((category) => category.id));
+    txs = txs.filter((tx) => tx.category == null || !known.has(tx.category));
+  } else if (filters.category) {
     const categoryId = Number(filters.category);
-    txs = txs.filter((tx) => tx.category === categoryId);
+    const exact = filters.category_exact === true || filters.category_exact === "1" || filters.category_exact === "true";
+    const ids = categoryFilterIds(categories, categoryId, exact);
+    txs = txs.filter((tx) => tx.category != null && ids.has(tx.category));
   }
   if (filters.type) {
     txs = txs.filter((tx) => tx.type === filters.type);

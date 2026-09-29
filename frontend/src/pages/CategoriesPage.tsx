@@ -7,6 +7,7 @@ import GlyphIcon from "../components/GlyphIcon";
 import TagFormModal from "../components/TagFormModal";
 import { deleteCategory, deleteTag } from "../data/repository";
 import { listCategories, listTags } from "../data/queries";
+import { useAsyncAction } from "../hooks/useAsyncAction";
 import { getChildren, priorityLabel, resolveCategoryColor } from "../utils/categoryTree";
 
 export default function CategoriesPage({ embedded = false }: { embedded?: boolean }) {
@@ -18,6 +19,7 @@ export default function CategoriesPage({ embedded = false }: { embedded?: boolea
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editingTag, setEditingTag] = useState<Tag | null>(null);
   const [collapsed, setCollapsed] = useState<Set<number>>(new Set());
+  const { pending, run } = useAsyncAction();
 
   const roots = useMemo(() => getChildren(categories, null), [categories]);
 
@@ -30,16 +32,16 @@ export default function CategoriesPage({ embedded = false }: { embedded?: boolea
     });
   }
 
-  async function onDeleteCategory(category: Category) {
+  function onDeleteCategory(category: Category) {
     const label = t("confirm.category", { name: category.name });
     if (!window.confirm(t("confirm.delete", { label }))) return;
-    await deleteCategory(category.id);
+    void run(() => deleteCategory(category.id));
   }
 
-  async function onDeleteTag(tag: Tag) {
+  function onDeleteTag(tag: Tag) {
     const label = t("confirm.tag", { name: tag.name });
     if (!window.confirm(t("confirm.delete", { label }))) return;
-    await deleteTag(tag.id);
+    void run(() => deleteTag(tag.id));
   }
 
   function renderCategory(category: Category, depth: number) {
@@ -78,7 +80,9 @@ export default function CategoriesPage({ embedded = false }: { embedded?: boolea
             {category.name} <span className="badge">{t(`txType.${category.type}`)}</span>
             {priority ? <span className="badge priority">{priority}</span> : null}
           </button>
-          <button type="button" className="danger" onClick={() => onDeleteCategory(category)}>×</button>
+          <button type="button" className="danger" onClick={() => onDeleteCategory(category)} disabled={pending} aria-busy={pending}>
+            {pending ? t("common.working") : "×"}
+          </button>
         </div>
         {hasChildren && !isCollapsed && (
           <ul className="item-list category-tree nested">
@@ -114,7 +118,9 @@ export default function CategoriesPage({ embedded = false }: { embedded?: boolea
                 <button type="button" className="item-row-main" onClick={() => { setEditingTag(tag); setTagModalOpen(true); }}>
                   <span style={{ color: tag.color }}>●</span> {tag.name}
                 </button>
-                <button type="button" className="danger" onClick={() => onDeleteTag(tag)}>×</button>
+                <button type="button" className="danger" onClick={() => onDeleteTag(tag)} disabled={pending} aria-busy={pending}>
+                  {pending ? t("common.working") : "×"}
+                </button>
               </li>
             ))}
             {tags.length === 0 && <p className="muted-text">{t("categoriesPage.noTags")}</p>}

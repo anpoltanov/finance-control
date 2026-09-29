@@ -25,6 +25,11 @@
     "delete": "Delete",
     "del": "Del",
     "loading": "Loading…",
+    "saving": "Saving…",
+    "deleting": "Deleting…",
+    "signingIn": "Signing in…",
+    "signingOut": "Signing out…",
+    "working": "Working…",
     "none": "None",
     "select": "Select",
     "yes": "yes",
@@ -230,7 +235,10 @@
     "nextDate": "Next date",
     "repeat": "Repeat",
     "autocommit": "Autocommit",
-    "commitNow": "Commit now"
+    "commitNow": "Commit now",
+    "reviewCommit": "Review and commit",
+    "reviewTitle": "Review and commit",
+    "committing": "Committing…"
   },
   "reports": {
     "title": "Reports",
@@ -239,7 +247,10 @@
     "income": "Income",
     "expense": "Expense",
     "byCategory": "By category",
-    "monthlyTrends": "Monthly trends"
+    "monthlyTrends": "Monthly trends",
+    "uncategorized": "Uncategorized",
+    "total": "Total",
+    "change": "Change"
   },
   "import": {
     "title": "Import from WalletApp",

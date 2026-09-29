@@ -158,6 +158,15 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [FRONTEND_DIST] if FRONTEND_DIST.exists() else []
+
+
+def _static_headers(headers, path, url):
+    # /static/sw.js is not at the site root, so Chrome only allows a wider scope with this header.
+    if url.endswith("/sw.js"):
+        headers["Service-Worker-Allowed"] = "/"
+
+
+WHITENOISE_ADD_HEADERS_FUNCTION = _static_headers
 # Vite already content-hashes assets; Django manifest hashing would 404 them.
 STORAGES = {
     "staticfiles": {

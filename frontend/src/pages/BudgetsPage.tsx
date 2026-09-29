@@ -5,6 +5,7 @@ import type { Budget } from "../api/client";
 import BudgetFormModal from "../components/BudgetFormModal";
 import { deleteBudget } from "../data/repository";
 import { listBudgetsWithStatus } from "../data/reports";
+import { useAsyncAction } from "../hooks/useAsyncAction";
 import { formatCurrency } from "../utils/format";
 
 export default function BudgetsPage() {
@@ -12,6 +13,7 @@ export default function BudgetsPage() {
   const budgets = useLiveQuery(() => listBudgetsWithStatus(), []) ?? [];
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Budget | null>(null);
+  const { pending, run } = useAsyncAction();
 
   return (
     <div>
@@ -38,7 +40,17 @@ export default function BudgetsPage() {
             </p>
             <div className="card-actions">
               <button type="button" className="secondary" onClick={() => { setEditing(b); setModalOpen(true); }}>{t("common.edit")}</button>
-              <button type="button" className="danger" onClick={() => deleteBudget(b.id)}>{t("common.delete")}</button>
+              <button
+                type="button"
+                className="danger"
+                disabled={pending}
+                aria-busy={pending}
+                onClick={() => {
+                  void run(() => deleteBudget(b.id));
+                }}
+              >
+                {pending ? t("common.deleting") : t("common.delete")}
+              </button>
             </div>
           </div>
         ))}

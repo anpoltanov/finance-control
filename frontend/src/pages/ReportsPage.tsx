@@ -1,138 +1,222 @@
-import { useState } from "react";
-import { Chart as ChartJS, ArcElement, CategoryScale, LinearScale, BarElement, Tooltip, Legend } from "chart.js";
-import { Bar, Doughnut } from "react-chartjs-2";
+import { useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useTranslation } from "react-i18next";
+import type { Transaction } from "../api/client";
 import DateRangeNav from "../components/DateRangeNav";
-import { computeReportSummary } from "../data/reports";
-import { runSync } from "../hooks/useOfflineSync";
+import TransactionFilters from "../components/TransactionFilters";
+import TransactionList from "../components/TransactionList";
+import { PctBadge } from "../components/dashboard/SemiGauge";
+import { useAddTransaction } from "../context/AddTransactionContext";
+import { useFilterSidebar } from "../context/FilterSidebarContext";
+import { buildIncomeExpenseReport, type IncomeExpenseGroup, type IncomeExpenseRow } from "../data/incomeExpense";
+import { previousEqualRange } from "../data/dashboard";
+import { listAccounts, listCategories, listTags, listTransactions } from "../data/queries";
 import { useDateRangePeriod } from "../hooks/useDateRangePeriod";
-import { formatCurrency, chartNumericValue } from "../utils/format";
+import { formatCurrency } from "../utils/format";
 
-ChartJS.register(ArcElement, CategoryScale, LinearScale, BarElement, Tooltip, Legend);
+interface OperationsView {
+  title: string;
+  categoryId: number | null;
+  exact: boolean;
+  uncategorized: boolean;
+}
 
 export default function ReportsPage() {
   const { t, i18n } = useTranslation();
+  const { openEditTransaction } = useAddTransaction();
   const range = useDateRangePeriod("month");
-  const [syncStatus, setSyncStatus] = useState("");
+  const [filters, setFilters] = useState<Record<string, string>>({});
+  const [drill, setDrill] = useState<number[]>([]);
+  const [operations, setOperations] = useState<OperationsView | null>(null);
 
-  const report = useLiveQuery(
-    () => computeReportSummary(range.fromParam || undefined, range.toParam || undefined),
-    [range.fromParam, range.toParam, i18n.language]
+  const parentId = drill.length ? drill[drill.length - 1] : null;
+
+  const periodFilters = useMemo(() => {
+    const next = { ...filters };
+    if (range.fromParam) next.date_from = range.fromParam;
+    if (range.toParam) next.date_to = range.toParam;
+    return next;
+  }, [filters, range.fromParam, range.toParam]);
+
+  const previousFilters = useMemo(() => {
+    if (!range.from || !range.to) return null;
+    const prev = previousEqualRange(range.from, range.to);
+    return { ...filters, date_from: prev.from, date_to: `${prev.to}T23:59:59` };
+  }, [filters, range.from, range.to]);
+
+  const operationFilters = useMemo(() => {
+    if (!operations) return periodFilters;
+    const next = { ...periodFilters };
+    if (operations.uncategorized) next.uncategorized = "1";
+    else if (operations.categoryId != null) {
+      next.category = String(operations.categoryId);
+      if (operations.exact) next.category_exact = "1";
+    }
+    return next;
+  }, [operations, periodFilters]);
+
+  const transactions = useLiveQuery(() => listTransactions(periodFilters), [periodFilters]) ?? [];
+  const previousTransactions =
+    useLiveQuery(() => (previousFilters ? listTransactions(previousFilters) : Promise.resolve([])), [previousFilters]) ??
+    [];
+  const operationTransactions = useLiveQuery(() => listTransactions(operationFilters), [operationFilters]) ?? [];
+  const accounts = useLiveQuery(() => listAccounts(), []) ?? [];
+  const categories = useLiveQuery(() => listCategories(), []) ?? [];
+  const tags = useLiveQuery(() => listTags(), []) ?? [];
+
+  const report = useMemo(
+    () =>
+      buildIncomeExpenseReport({
+        transactions,
+        previousTransactions,
+        categories,
+        excludedAccountIds: accounts.filter((account) => account.exclude_from_statistics).map((account) => account.id),
+        parentId,
+        uncategorizedName: t("reports.uncategorized"),
+      }),
+    [transactions, previousTransactions, categories, accounts, parentId, t]
   );
 
-  async function syncNow() {
-    await runSync();
-    setSyncStatus(t("reports.syncedAt", { time: new Date().toISOString() }));
+  const parentName = parentId ? categories.find((category) => category.id === parentId)?.name : null;
+
+  const filterSidebar = useMemo(
+    () => (
+      <TransactionFilters
+        filters={filters}
+        onChange={(next) => {
+          setFilters(next);
+          setDrill([]);
+          setOperations(null);
+        }}
+        accounts={accounts}
+        categories={categories}
+        tags={tags}
+      />
+    ),
+    [filters, accounts, categories, tags, i18n.language]
+  );
+  useFilterSidebar(filterSidebar, [filters, accounts, categories, tags, i18n.language]);
+
+  function openRow(row: IncomeExpenseRow) {
+    if (row.hasChildren && row.categoryId != null) {
+      setOperations(null);
+      setDrill((path) => [...path, row.categoryId as number]);
+      return;
+    }
+    setOperations({
+      title: row.name,
+      categoryId: row.categoryId,
+      exact: row.exact,
+      uncategorized: row.uncategorized,
+    });
   }
 
-  const categoryData = report
-    ? {
-        labels: report.by_category.map((c) => c.category_name),
-        datasets: [{
-          data: report.by_category.map((c) => parseFloat(c.total)),
-          backgroundColor: report.by_category.map((c) => c.category_color || "#6366f1"),
-        }],
-      }
-    : null;
-
-  const months = report ? ([...new Set(report.monthly.map((m) => m.month))].filter(Boolean) as string[]) : [];
-  const barData = report
-    ? {
-        labels: months.map((m) => m.slice(0, 7)),
-        datasets: [
-          {
-            label: t("txType.expense"),
-            data: months.map((m) => parseFloat(report.monthly.find((x) => x.month === m && x.type === "expense")?.total || "0")),
-            backgroundColor: "#ef4444",
-          },
-          {
-            label: t("txType.income"),
-            data: months.map((m) => parseFloat(report.monthly.find((x) => x.month === m && x.type === "income")?.total || "0")),
-            backgroundColor: "#22c55e",
-          },
-        ],
-      }
-    : null;
+  function goBack() {
+    if (operations) {
+      setOperations(null);
+      return;
+    }
+    setDrill((path) => path.slice(0, -1));
+  }
 
   return (
     <div>
       <div className="page-header">
         <h2>{t("reports.title")}</h2>
         <DateRangeNav range={range} />
-        <button className="secondary" onClick={syncNow}>{t("reports.sync")}</button>
       </div>
-      {syncStatus && <p className="muted-text">{syncStatus}</p>}
 
-      {!report ? (
-        <p>{t("common.loading")}</p>
+      {operations ? (
+        <div className="card report-operations">
+          <div className="widget-header">
+            <h3>{operations.title}</h3>
+            <button type="button" className="secondary" onClick={goBack}>
+              {t("common.back")}
+            </button>
+          </div>
+          <TransactionList
+            transactions={operationTransactions}
+            onEdit={(tx: Transaction) => openEditTransaction(tx)}
+          />
+        </div>
       ) : (
-        <>
-          <div className="grid">
-            <div className="card">
-              <h3>{t("reports.income")}</h3>
-              <p style={{ fontSize: "1.5rem" }}>{formatCurrency(report.income_total)}</p>
+        <div className="card report-table-card">
+          {(drill.length > 0 || parentName) && (
+            <div className="widget-header">
+              <h3>{parentName}</h3>
+              <button type="button" className="secondary" onClick={goBack}>
+                {t("common.back")}
+              </button>
             </div>
-            <div className="card">
-              <h3>{t("reports.expense")}</h3>
-              <p style={{ fontSize: "1.5rem" }}>{formatCurrency(report.expense_total)}</p>
-            </div>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-            <div className="card">
-              <h3>{t("reports.byCategory")}</h3>
-              {report.by_category.length > 0 && categoryData ? (
-                <Doughnut
-                  data={categoryData}
-                  options={{
-                    plugins: {
-                      tooltip: {
-                        callbacks: {
-                          label: (ctx) => {
-                            const name = ctx.label ? `${ctx.label}: ` : "";
-                            return `${name}${formatCurrency(chartNumericValue(ctx.parsed))}`;
-                          },
-                        },
-                      },
-                    },
-                  }}
-                />
-              ) : (
-                <p>{t("common.noData")}</p>
-              )}
-            </div>
-            <div className="card">
-              <h3>{t("reports.monthlyTrends")}</h3>
-              {months.length > 0 && barData ? (
-                <Bar
-                  data={barData}
-                  options={{
-                    responsive: true,
-                    plugins: {
-                      tooltip: {
-                        callbacks: {
-                          label: (ctx) => {
-                            const name = ctx.dataset.label ? `${ctx.dataset.label}: ` : "";
-                            return `${name}${formatCurrency(chartNumericValue(ctx.parsed))}`;
-                          },
-                        },
-                      },
-                    },
-                    scales: {
-                      y: {
-                        ticks: { callback: (value) => formatCurrency(Number(value)) },
-                      },
-                    },
-                  }}
-                />
-              ) : (
-                <p>{t("common.noData")}</p>
-              )}
-            </div>
-          </div>
-        </>
+          )}
+          <table className="report-table">
+            <thead>
+              <tr>
+                <th>{t("common.category")}</th>
+                <th className="report-amount">{t("reports.total")}</th>
+                <th className="report-amount">{t("reports.change")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {drill.length === 0 && <GroupRows group={report.income} label={t("reports.income")} onOpen={openRow} />}
+              {drill.length === 0 && <GroupRows group={report.expense} label={t("reports.expense")} onOpen={openRow} />}
+              {drill.length > 0 &&
+                report.income.rows.map((row) => (
+                  <CategoryRow key={`income-${row.key}`} row={row} onOpen={openRow} />
+                ))}
+              {drill.length > 0 &&
+                report.expense.rows.map((row) => (
+                  <CategoryRow key={`expense-${row.key}`} row={row} onOpen={openRow} invert />
+                ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
+  );
+}
+
+function GroupRows({
+  group,
+  label,
+  onOpen,
+}: {
+  group: IncomeExpenseGroup;
+  label: string;
+  onOpen: (row: IncomeExpenseRow) => void;
+}) {
+  return (
+    <>
+      <tr className="report-summary-row">
+        <th scope="row">{label}</th>
+        <td className="report-amount">{formatCurrency(group.total)}</td>
+        <td className="report-amount">
+          <PctBadge pct={group.pct} invert={group.kind === "expense"} />
+        </td>
+      </tr>
+      {group.rows.map((row) => (
+        <CategoryRow key={row.key} row={row} onOpen={onOpen} invert={group.kind === "expense"} />
+      ))}
+    </>
+  );
+}
+
+function CategoryRow({
+  row,
+  onOpen,
+  invert = false,
+}: {
+  row: IncomeExpenseRow;
+  onOpen: (row: IncomeExpenseRow) => void;
+  invert?: boolean;
+}) {
+  return (
+    <tr className="report-category-row" onClick={() => onOpen(row)}>
+      <td>{row.name}</td>
+      <td className="report-amount">{formatCurrency(row.total)}</td>
+      <td className="report-amount">
+        <PctBadge pct={row.pct} invert={invert} />
+      </td>
+    </tr>
   );
 }

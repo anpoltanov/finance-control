@@ -6,6 +6,7 @@ import type { Transaction } from "../api/client";
 import AccountFormModal from "../components/AccountFormModal";
 import GlyphIcon from "../components/GlyphIcon";
 import TransactionList from "../components/TransactionList";
+import TransactionTotals from "../components/TransactionTotals";
 import { useAddTransaction } from "../context/AddTransactionContext";
 import { getAccount, listTransactions } from "../data/queries";
 import { formatCurrency } from "../utils/format";
@@ -53,7 +54,7 @@ export default function AccountDetailPage() {
         </div>
       </div>
 
-      <p className="muted-text tx-count">{t("transactions.count", { count: transactions.length })}</p>
+      <TransactionTotals transactions={transactions} perspectiveAccountId={id} />
 
       <TransactionList
         transactions={transactions}

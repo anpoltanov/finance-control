@@ -120,10 +120,10 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify(data),
       }),
-    commit: (id: number) =>
+    commit: (id: number, body?: object) =>
       request<{ transaction: Transaction; planned: PlannedTransaction | null }>(
         `/planned-transactions/${id}/commit/`,
-        { method: "POST" }
+        { method: "POST", body: body && Object.keys(body).length > 0 ? JSON.stringify(body) : undefined }
       ),
     delete: (id: number) => request(`/planned-transactions/${id}/`, { method: "DELETE" }),
   },

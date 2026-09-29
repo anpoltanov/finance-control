@@ -5,6 +5,65 @@ from apps.ledger.serializers import assign_tags, set_many_related_queryset, user
 from apps.planning.models import PlannedTransaction
 
 
+class PlannedCommitSerializer(serializers.Serializer):
+    """Optional fields for one posted transaction. Schedule fields are not accepted."""
+
+    type = serializers.ChoiceField(choices=Transaction.TYPE_CHOICES, required=False)
+    account = serializers.PrimaryKeyRelatedField(queryset=Account.objects.none(), required=False)
+    to_account = serializers.PrimaryKeyRelatedField(
+        queryset=Account.objects.none(), required=False, allow_null=True
+    )
+    transfer_kind = serializers.ChoiceField(
+        choices=Transaction.TRANSFER_KIND_CHOICES, required=False, allow_null=True
+    )
+    amount = serializers.DecimalField(max_digits=18, decimal_places=2, required=False)
+    category = serializers.PrimaryKeyRelatedField(queryset=Category.objects.none(), required=False, allow_null=True)
+    date = serializers.DateTimeField(required=False)
+    notes = serializers.CharField(required=False, allow_blank=True)
+    recipient = serializers.CharField(required=False, allow_blank=True)
+    status = serializers.ChoiceField(choices=Transaction.STATUS_CHOICES, required=False)
+    payment_type = serializers.CharField(required=False, allow_blank=True)
+    currency_code = serializers.CharField(required=False, max_length=3)
+    tag_ids = serializers.PrimaryKeyRelatedField(
+        source="tags", queryset=Tag.objects.none(), many=True, required=False
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        set_many_related_queryset(self.fields["tag_ids"], user_owned_qs(Tag, user))
+        self.fields["account"].queryset = user_owned_qs(Account, user)
+        self.fields["to_account"].queryset = user_owned_qs(Account, user)
+        self.fields["category"].queryset = user_owned_qs(Category, user)
+
+    def validate(self, attrs):
+        planned = self.context["planned"]
+        tx_type = attrs.get("type", planned.type)
+        transfer_kind = attrs["transfer_kind"] if "transfer_kind" in attrs else planned.transfer_kind
+        account = attrs.get("account", planned.account)
+        to_account = attrs["to_account"] if "to_account" in attrs else planned.to_account
+        amount = attrs.get("amount", planned.amount)
+
+        if amount is not None and amount <= 0:
+            raise serializers.ValidationError({"amount": "Amount must be positive."})
+
+        if tx_type == Transaction.TYPE_TRANSFER:
+            if not transfer_kind:
+                raise serializers.ValidationError({"transfer_kind": "Required for transfers."})
+            if transfer_kind == Transaction.TRANSFER_ACCOUNT:
+                if not to_account:
+                    raise serializers.ValidationError({"to_account": "Destination account required."})
+                if account and to_account and account.id == to_account.id:
+                    raise serializers.ValidationError({"to_account": "Accounts must differ."})
+            elif transfer_kind in (Transaction.TRANSFER_TO_NOWHERE, Transaction.TRANSFER_FROM_NOWHERE):
+                attrs["to_account"] = None
+        else:
+            attrs["transfer_kind"] = None
+            attrs["to_account"] = None
+        return attrs
+
+
 class PlannedTransactionSerializer(serializers.ModelSerializer):
     tag_ids = serializers.PrimaryKeyRelatedField(
         source="tags",
