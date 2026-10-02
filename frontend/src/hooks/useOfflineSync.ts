@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { api, apiFetch } from "../api/client";
+import { api, apiFetch, type PlannedTransaction, type Transaction } from "../api/client";
 import { applySyncPayload, clearLocalCache, flushOutbox, getLastSyncedAt } from "../db/index";
 
 const SYNC_INTERVAL_MS = 60_000;
@@ -19,11 +19,12 @@ export async function runSync(): Promise<void> {
       if (!res.ok) throw new Error(`Outbox flush failed: ${res.status}`);
       if (res.status === 204) return;
       const data = await res.json().catch(() => null);
+      if (data && typeof data === "object" && "transaction" in data) {
+        const payload = data as { transaction: Transaction; planned?: PlannedTransaction | null };
+        return { transaction: payload.transaction, planned: payload.planned ?? null };
+      }
       if (data && typeof data === "object" && "id" in data) {
         return { id: Number(data.id) };
-      }
-      if (data && typeof data === "object" && "transaction" in data) {
-        return { id: Number((data as { transaction: { id: number } }).transaction.id) };
       }
     });
   } catch {

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import {
   Chart as ChartJS,
   ArcElement,
+  BarElement,
   CategoryScale,
   LinearScale,
   LineElement,
@@ -12,26 +13,35 @@ import {
   type ChartEvent,
   type ActiveElement,
 } from "chart.js";
-import { Doughnut, Line } from "react-chartjs-2";
+import { Bar, Doughnut, Line } from "react-chartjs-2";
+import { useLiveQuery } from "dexie-react-hooks";
 import { useTranslation } from "react-i18next";
+import type { ReportSummary } from "../../api/client";
 import { expenseSlices, pctChange, type DashboardSnapshot } from "../../data/dashboard";
+import { computeReportSummary } from "../../data/reports";
 import { formatCurrency, chartNumericValue } from "../../utils/format";
 import GlyphIcon from "../GlyphIcon";
 import SemiGauge, { PctBadge, trendColor } from "./SemiGauge";
 
-ChartJS.register(ArcElement, CategoryScale, LinearScale, LineElement, PointElement, Filler, Tooltip, Legend);
+ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, LineElement, PointElement, Filler, Tooltip, Legend);
 
 interface DashboardWidgetsProps {
   data: DashboardSnapshot;
+  from?: string;
+  to?: string;
 }
 
 function gaugeMax(current: number, previous: number): number {
   return Math.max(Math.abs(current), Math.abs(previous), 1);
 }
 
-export default function DashboardWidgets({ data }: DashboardWidgetsProps) {
+export default function DashboardWidgets({ data, from, to }: DashboardWidgetsProps) {
   const { t, i18n } = useTranslation();
   const currency = data.primaryCurrency;
+  const report = useLiveQuery(
+    () => computeReportSummary(from || undefined, to || undefined),
+    [from, to, i18n.language]
+  );
   const [drill, setDrill] = useState<number[]>([]);
 
   const parentId = drill.length ? drill[drill.length - 1] : null;
@@ -163,6 +173,25 @@ export default function DashboardWidgets({ data }: DashboardWidgetsProps) {
         </div>
       </section>
 
+      <section className="card widget-card widget-stat">
+        <h3>{t("reports.income")}</h3>
+        <p className="widget-hero">{report ? formatCurrency(report.income_total, currency) : t("common.loading")}</p>
+      </section>
+      <section className="card widget-card widget-stat">
+        <h3>{t("reports.expense")}</h3>
+        <p className="widget-hero">{report ? formatCurrency(report.expense_total, currency) : t("common.loading")}</p>
+      </section>
+      <section className="card widget-card widget-span">
+        <h3>{t("reports.monthlyTrends")}</h3>
+        {report && report.monthly.length > 0 ? (
+          <div className="widget-chart">
+            <MonthlyBars report={report} currency={currency} />
+          </div>
+        ) : (
+          <p className="muted-text">{t("common.noData")}</p>
+        )}
+      </section>
+
       <section className="card widget-card">
         <div className="widget-header">
           <h3>{t("dashboard.expensesStructure")}</h3>
@@ -218,5 +247,50 @@ export default function DashboardWidgets({ data }: DashboardWidgetsProps) {
         )}
       </section>
     </div>
+  );
+}
+
+function MonthlyBars({ report, currency }: { report: ReportSummary; currency: string }) {
+  const { t } = useTranslation();
+  const months = [...new Set(report.monthly.map((row) => row.month))].filter(Boolean) as string[];
+  return (
+    <Bar
+      data={{
+        labels: months.map((month) => month.slice(0, 7)),
+        datasets: [
+          {
+            label: t("txType.expense"),
+            data: months.map((month) =>
+              parseFloat(report.monthly.find((row) => row.month === month && row.type === "expense")?.total || "0")
+            ),
+            backgroundColor: "#ef4444",
+          },
+          {
+            label: t("txType.income"),
+            data: months.map((month) =>
+              parseFloat(report.monthly.find((row) => row.month === month && row.type === "income")?.total || "0")
+            ),
+            backgroundColor: "#22c55e",
+          },
+        ],
+      }}
+      options={{
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const name = ctx.dataset.label ? `${ctx.dataset.label}: ` : "";
+                return `${name}${formatCurrency(chartNumericValue(ctx.parsed), currency)}`;
+              },
+            },
+          },
+        },
+        scales: {
+          y: { ticks: { callback: (value) => formatCurrency(Number(value), currency) } },
+        },
+      }}
+    />
   );
 }

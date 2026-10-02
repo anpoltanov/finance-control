@@ -25,6 +25,11 @@
     "delete": "Удалить",
     "del": "Уд.",
     "loading": "Загрузка…",
+    "saving": "Сохранение…",
+    "deleting": "Удаление…",
+    "signingIn": "Вход…",
+    "signingOut": "Выход…",
+    "working": "Выполняется…",
     "none": "Нет",
     "select": "Выберите",
     "yes": "да",
@@ -232,7 +237,10 @@
     "nextDate": "Следующая дата",
     "repeat": "Повтор",
     "autocommit": "Автопроведение",
-    "commitNow": "Провести сейчас"
+    "commitNow": "Провести сейчас",
+    "reviewCommit": "Проверить и провести",
+    "reviewTitle": "Проверить и провести",
+    "committing": "Проведение…"
   },
   "reports": {
     "title": "Отчёты",
@@ -241,7 +249,10 @@
     "income": "Доходы",
     "expense": "Расходы",
     "byCategory": "По категориям",
-    "monthlyTrends": "По месяцам"
+    "monthlyTrends": "По месяцам",
+    "uncategorized": "Без категории",
+    "total": "Сумма",
+    "change": "Изменение"
   },
   "import": {
     "title": "Импорт из WalletApp",

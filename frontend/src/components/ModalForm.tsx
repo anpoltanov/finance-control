@@ -1,12 +1,13 @@
-import { FormEvent, ReactNode } from "react";
+import { FormEvent, ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useAsyncAction } from "../hooks/useAsyncAction";
 import Modal from "./Modal";
 
 interface ModalFormProps {
   open: boolean;
   title: string;
   onClose: () => void;
-  onSubmit: (e: FormEvent) => void;
+  onSubmit: (e: FormEvent) => void | Promise<void>;
   submitLabel?: string;
   children: ReactNode;
   wide?: boolean;
@@ -26,27 +27,50 @@ export default function ModalForm({
   deleteConfirmMessage,
 }: ModalFormProps) {
   const { t } = useTranslation();
+  const { pending, error, run } = useAsyncAction();
+  const [mode, setMode] = useState<"save" | "delete">("save");
 
-  async function requestDelete() {
-    if (!onDelete) return;
-    if (!window.confirm(deleteConfirmMessage ?? t("confirm.deleteThis"))) return;
-    await onDelete();
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setMode("save");
+    await run(() => Promise.resolve(onSubmit(e)));
   }
 
+  async function requestDelete() {
+    if (!onDelete || pending) return;
+    if (!window.confirm(deleteConfirmMessage ?? t("confirm.deleteThis"))) return;
+    setMode("delete");
+    await run(() => Promise.resolve(onDelete()));
+  }
+
+  const saveLabel = pending && mode === "save" ? t("common.saving") : (submitLabel ?? t("common.save"));
+  const deleteLabel = pending && mode === "delete" ? t("common.deleting") : t("common.delete");
+
   return (
-    <Modal open={open} title={title} onClose={onClose} wide={wide}>
-      <form onSubmit={onSubmit}>
-        {children}
+    <Modal open={open} title={title} onClose={onClose} wide={wide} busy={pending}>
+      <form className="modal-form" onSubmit={handleSubmit}>
+        <div className="modal-body">
+          {error && <p className="form-error">{error}</p>}
+          {children}
+        </div>
         <div className="modal-footer">
           {onDelete && (
-            <button type="button" className="danger modal-footer-delete" onClick={requestDelete}>
-              {t("common.delete")}
+            <button
+              type="button"
+              className="danger modal-footer-delete"
+              onClick={requestDelete}
+              disabled={pending}
+              aria-busy={pending && mode === "delete"}
+            >
+              {deleteLabel}
             </button>
           )}
-          <button type="button" className="secondary" onClick={onClose}>
+          <button type="button" className="secondary" onClick={onClose} disabled={pending}>
             {t("common.cancel")}
           </button>
-          <button type="submit">{submitLabel ?? t("common.save")}</button>
+          <button type="submit" disabled={pending} aria-busy={pending && mode === "save"}>
+            {saveLabel}
+          </button>
         </div>
       </form>
     </Modal>

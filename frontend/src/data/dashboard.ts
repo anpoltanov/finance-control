@@ -60,10 +60,7 @@ export function previousEqualRange(fromYmd: string, toYmdValue: string): { from:
   return { from: toYmd(prevFrom), to: toYmd(prevTo) };
 }
 
-export function pctChange(current: number, previous: number): number | null {
-  if (previous === 0) return current === 0 ? 0 : null;
-  return ((current - previous) / Math.abs(previous)) * 100;
-}
+export { pctChange } from "../utils/pctChange";
 
 function statisticalDelta(tx: Transaction, accounts: Map<number, Account>): number {
   const fromAcc = accounts.get(tx.account);

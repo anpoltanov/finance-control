@@ -81,13 +81,27 @@ export async function getLastSyncedAt(): Promise<string | undefined> {
   return row?.value;
 }
 
-export async function flushOutbox(
-  fetchFn: (item: OutboxItem) => Promise<{ id: number } | { drop: true } | void>
-) {
+export type OutboxFlushResult =
+  | void
+  | { drop: true }
+  | { id: number }
+  | { transaction: Transaction; planned: PlannedTransaction | null };
+
+export async function flushOutbox(fetchFn: (item: OutboxItem) => Promise<OutboxFlushResult>) {
   const items = await db.outbox.orderBy("createdAt").toArray();
   for (const item of items) {
     const result = await fetchFn(item);
     if (result && typeof result === "object" && "drop" in result && result.drop) {
+      if (item.id) await db.outbox.delete(item.id);
+      continue;
+    }
+    if (result && typeof result === "object" && "transaction" in result && result.transaction) {
+      if (item.localId) await db.transactions.delete(item.localId);
+      await db.transactions.put(result.transaction);
+      const plannedMatch = item.path.match(/\/planned-transactions\/(\d+)\/commit\/?$/);
+      const plannedId = plannedMatch ? Number(plannedMatch[1]) : undefined;
+      if (result.planned) await db.planned.put(result.planned);
+      else if (plannedId) await db.planned.delete(plannedId);
       if (item.id) await db.outbox.delete(item.id);
       continue;
     }

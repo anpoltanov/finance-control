@@ -5,6 +5,7 @@ import type { Transaction } from "../api/client";
 import DateRangeNav from "../components/DateRangeNav";
 import TransactionFilters from "../components/TransactionFilters";
 import TransactionList from "../components/TransactionList";
+import TransactionTotals from "../components/TransactionTotals";
 import { useAddTransaction } from "../context/AddTransactionContext";
 import { useFilterSidebar } from "../context/FilterSidebarContext";
 import { listAccounts, listCategories, listTags, listTransactions } from "../data/queries";
@@ -48,7 +49,7 @@ export default function TransactionsPage() {
       <div className="page-header">
         <div>
           <h2>{t("transactions.title")}</h2>
-          <p className="muted-text tx-count">{t("transactions.count", { count: transactions.length })}</p>
+          <TransactionTotals transactions={transactions} />
         </div>
         <DateRangeNav range={range} />
       </div>

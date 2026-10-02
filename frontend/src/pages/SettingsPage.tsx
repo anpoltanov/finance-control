@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { useAsyncAction } from "../hooks/useAsyncAction";
 import { resetLocalCache, runSync } from "../hooks/useOfflineSync";
 import AccountsPage from "./AccountsPage";
 import CategoriesPage from "./CategoriesPage";
@@ -19,9 +20,10 @@ export default function SettingsPage() {
   const tabParam = params.get("tab");
   const tab = parseTab(tabParam);
   const [localTab, setLocalTab] = useState<SettingsTab>(tab);
-  const [busy, setBusy] = useState<"sync" | "reset" | null>(null);
+  const [which, setWhich] = useState<"sync" | "reset" | null>(null);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
+  const { pending, run } = useAsyncAction();
 
   const active = useMemo(() => (tabParam ? tab : localTab), [tabParam, tab, localTab]);
 
@@ -31,33 +33,37 @@ export default function SettingsPage() {
     else setParams({ tab: next });
   }
 
-  async function syncNow() {
-    setBusy("sync");
-    setError("");
-    setStatus("");
-    try {
-      await runSync();
-      setStatus(t("settings.data.synced", { time: new Date().toLocaleString() }));
-    } catch {
-      setError(t("settings.data.syncFailed"));
-    } finally {
-      setBusy(null);
-    }
+  function syncNow() {
+    void run(async () => {
+      setWhich("sync");
+      setError("");
+      setStatus("");
+      try {
+        await runSync();
+        setStatus(t("settings.data.synced", { time: new Date().toLocaleString() }));
+      } catch {
+        setError(t("settings.data.syncFailed"));
+      } finally {
+        setWhich(null);
+      }
+    });
   }
 
-  async function resetNow() {
+  function resetNow() {
     if (!window.confirm(t("settings.data.resetConfirm"))) return;
-    setBusy("reset");
-    setError("");
-    setStatus("");
-    try {
-      await resetLocalCache();
-      setStatus(t("settings.data.resetDone"));
-    } catch {
-      setError(t("settings.data.resetFailed"));
-    } finally {
-      setBusy(null);
-    }
+    void run(async () => {
+      setWhich("reset");
+      setError("");
+      setStatus("");
+      try {
+        await resetLocalCache();
+        setStatus(t("settings.data.resetDone"));
+      } catch {
+        setError(t("settings.data.resetFailed"));
+      } finally {
+        setWhich(null);
+      }
+    });
   }
 
   return (
@@ -90,11 +96,11 @@ export default function SettingsPage() {
           <h3>{t("settings.data.title")}</h3>
           <p className="muted-text">{t("settings.data.hint")}</p>
           <div className="settings-data-actions">
-            <button type="button" onClick={syncNow} disabled={busy !== null}>
-              {busy === "sync" ? t("settings.data.syncing") : t("settings.data.syncNow")}
+            <button type="button" onClick={syncNow} disabled={pending} aria-busy={pending && which === "sync"}>
+              {pending && which === "sync" ? t("settings.data.syncing") : t("settings.data.syncNow")}
             </button>
-            <button type="button" className="secondary" onClick={resetNow} disabled={busy !== null}>
-              {busy === "reset" ? t("settings.data.resetting") : t("settings.data.reset")}
+            <button type="button" className="secondary" onClick={resetNow} disabled={pending} aria-busy={pending && which === "reset"}>
+              {pending && which === "reset" ? t("settings.data.resetting") : t("settings.data.reset")}
             </button>
           </div>
           {status && <p className="muted-text">{status}</p>}

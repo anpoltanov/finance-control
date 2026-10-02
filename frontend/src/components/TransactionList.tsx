@@ -1,6 +1,7 @@
 import type { Transaction } from "../api/client";
 import { useTranslation } from "react-i18next";
 import { formatDate, formatSignedCurrency } from "../utils/format";
+import { signedNetContribution } from "../utils/transactionTotals";
 import { formatSignedAmount, transferRoute } from "../utils/transactionDisplay";
 import GlyphIcon from "./GlyphIcon";
 
@@ -21,20 +22,6 @@ interface DayGroup {
 
 function dayKey(iso: string): string {
   return iso.slice(0, 10);
-}
-
-function signedNetContribution(tx: Transaction, perspectiveAccountId?: number): number {
-  const amount = parseFloat(tx.amount) || 0;
-  if (tx.type === "expense") return -amount;
-  if (tx.type === "income") return amount;
-  if (tx.type === "transfer") {
-    if (!perspectiveAccountId) return 0;
-    if (tx.to_account === perspectiveAccountId) return amount;
-    if (tx.account === perspectiveAccountId && tx.transfer_kind === "from_nowhere") return amount;
-    if (tx.account === perspectiveAccountId) return -amount;
-    return 0;
-  }
-  return 0;
 }
 
 function groupByDay(transactions: Transaction[], perspectiveAccountId?: number): DayGroup[] {

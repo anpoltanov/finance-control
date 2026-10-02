@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
+import { useAsyncAction } from "../hooks/useAsyncAction";
 import { useAddTransaction } from "../context/AddTransactionContext";
 import { setLocale, type AppLocale } from "../i18n";
 import { readTheme, setTheme, type ThemeMode } from "../theme";
@@ -23,6 +24,7 @@ export default function AppHeader() {
   const [username, setUsername] = useState("");
   const [theme, setThemeState] = useState<ThemeMode>(() => readTheme());
   const [menuOpen, setMenuOpen] = useState(false);
+  const { pending, run } = useAsyncAction();
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -37,9 +39,11 @@ export default function AppHeader() {
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
 
-  async function logout() {
-    await api.logout();
-    navigate("/login");
+  function logout() {
+    void run(async () => {
+      await api.logout();
+      navigate("/login");
+    });
   }
 
   function switchLocale(next: AppLocale) {
@@ -121,12 +125,11 @@ export default function AppHeader() {
               <button
                 type="button"
                 role="menuitem"
-                onClick={() => {
-                  setMenuOpen(false);
-                  logout();
-                }}
+                disabled={pending}
+                aria-busy={pending}
+                onClick={logout}
               >
-                {t("nav.logout")}
+                {pending ? t("common.signingOut") : t("nav.logout")}
               </button>
             </div>
           )}

@@ -51,29 +51,40 @@ class PlannedTransaction(TimestampedModel):
         elif self.repeat_rule == self.REPEAT_YEARLY:
             self.next_occurrence_date += relativedelta(years=1)
 
-    def commit(self) -> Transaction:
-        naive = datetime.combine(self.next_occurrence_date, dt_time.min)
+    def commit(self, overrides=None) -> Transaction:
+        overrides = overrides or {}
+        when = overrides.get("date")
+        if when is None:
+            naive = datetime.combine(self.next_occurrence_date, dt_time.min)
+            when = timezone.make_aware(naive) if timezone.is_naive(naive) else naive
+        elif timezone.is_naive(when):
+            when = timezone.make_aware(when)
+
         tx = Transaction.objects.create(
             user=self.user,
-            type=self.type,
-            account=self.account,
-            to_account=self.to_account,
-            transfer_kind=self.transfer_kind,
-            amount=self.amount,
-            category=self.category,
-            date=timezone.make_aware(naive) if timezone.is_naive(naive) else naive,
-            notes=self.notes,
-            recipient=self.recipient,
-            payment_type=self.payment_type,
-            currency_code=self.currency_code,
+            type=overrides.get("type", self.type),
+            account=overrides.get("account", self.account),
+            to_account=overrides["to_account"] if "to_account" in overrides else self.to_account,
+            transfer_kind=overrides["transfer_kind"] if "transfer_kind" in overrides else self.transfer_kind,
+            amount=overrides.get("amount", self.amount),
+            category=overrides["category"] if "category" in overrides else self.category,
+            date=when,
+            notes=overrides.get("notes", self.notes),
+            recipient=overrides.get("recipient", self.recipient),
+            payment_type=overrides.get("payment_type", self.payment_type),
+            currency_code=overrides.get("currency_code", self.currency_code),
             planned_transaction=self,
-            status=Transaction.STATUS_CLEARED,
+            status=overrides.get("status", Transaction.STATUS_CLEARED),
         )
-        tx.tags.set(self.tags.all())
+        if "tags" in overrides:
+            tx.tags.set(overrides["tags"])
+        else:
+            tx.tags.set(self.tags.all())
         self.last_committed_at = timezone.now()
         if self.repeat_rule == self.REPEAT_ONCE:
             self.soft_delete()
         else:
+            # Advance from the template's original next date, not the posted transaction date.
             self.advance_schedule()
             self.save(update_fields=["last_committed_at", "next_occurrence_date", "updated_at", "version"])
         return tx

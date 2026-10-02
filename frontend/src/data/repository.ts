@@ -1,5 +1,6 @@
 import { api, type Account, type Budget, type Category, type PlannedTransaction, type Tag, type Transaction } from "../api/client";
 import { db, nextTempId, queueOutbox } from "../db";
+import { offlineCommitOutbox, type PlannedCommitOverrides } from "./commitRequest";
 import { enrichTransaction } from "./queries";
 import { computeBudgetStatus } from "./reports";
 
@@ -330,8 +331,20 @@ export async function deletePlanned(id: number): Promise<void> {
   }
 }
 
-export async function commitPlanned(id: number): Promise<void> {
-  const online = await tryOnline(() => api.planned.commit(id));
+function advancePlannedDate(date: string, rule: PlannedTransaction["repeat_rule"]): string {
+  const [year, month, day] = date.slice(0, 10).split("-").map(Number);
+  const next = new Date(year, (month || 1) - 1, day || 1);
+  if (rule === "monthly") next.setMonth(next.getMonth() + 1);
+  else if (rule === "yearly") next.setFullYear(next.getFullYear() + 1);
+  const y = next.getFullYear();
+  const m = String(next.getMonth() + 1).padStart(2, "0");
+  const d = String(next.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+export async function commitPlanned(id: number, overrides?: PlannedCommitOverrides): Promise<void> {
+  const request = offlineCommitOutbox(id, overrides);
+  const online = await tryOnline(() => api.planned.commit(id, request.body));
   if (online.ok) {
     const result = online.value;
     if (result.transaction) await db.transactions.put(await enrichTransaction(result.transaction));
@@ -339,37 +352,45 @@ export async function commitPlanned(id: number): Promise<void> {
     else await db.planned.delete(id);
     return;
   }
-  // Offline commit: create local transaction and advance/delete planned
   const planned = await db.planned.get(id);
   if (!planned) return;
-  await createTransaction({
-    type: planned.type,
-    account: planned.account,
-    to_account: planned.to_account,
-    transfer_kind: planned.transfer_kind as Transaction["transfer_kind"],
-    amount: planned.amount,
-    category: planned.category,
-    date: `${planned.next_occurrence_date}T00:00:00`,
-    notes: planned.notes,
-    recipient: planned.recipient,
-    payment_type: planned.payment_type,
-    currency_code: planned.currency_code,
-    tag_ids: planned.tag_ids,
-    status: "cleared",
+  const localId = await nextTempId();
+  const postedDate = overrides?.date || `${planned.next_occurrence_date}T00:00:00`;
+  const local = await enrichTransaction({
+    id: localId,
+    type: overrides?.type || planned.type,
+    account: overrides?.account ?? planned.account,
+    to_account: overrides && "to_account" in overrides ? overrides.to_account ?? null : planned.to_account,
+    transfer_kind: (overrides && "transfer_kind" in overrides
+      ? overrides.transfer_kind
+      : planned.transfer_kind) as Transaction["transfer_kind"],
+    amount: String(overrides?.amount ?? planned.amount),
+    category: overrides && "category" in overrides ? overrides.category ?? null : planned.category,
+    date: postedDate,
+    notes: overrides?.notes ?? planned.notes,
+    recipient: overrides?.recipient ?? planned.recipient,
+    status: overrides?.status || "cleared",
+    payment_type: overrides?.payment_type ?? planned.payment_type,
+    currency_code: overrides?.currency_code || planned.currency_code,
+    tag_ids: overrides?.tag_ids ?? planned.tag_ids ?? [],
   });
+  await db.transactions.put(local);
   if (planned.repeat_rule === "once") {
     await db.planned.delete(id);
   } else {
-    const next = new Date(planned.next_occurrence_date);
-    if (planned.repeat_rule === "monthly") next.setMonth(next.getMonth() + 1);
-    else next.setFullYear(next.getFullYear() + 1);
     await db.planned.put({
       ...planned,
-      next_occurrence_date: next.toISOString().slice(0, 10),
+      next_occurrence_date: advancePlannedDate(planned.next_occurrence_date, planned.repeat_rule),
       last_committed_at: new Date().toISOString(),
     });
   }
   if (id > 0) {
-    await queueOutbox({ method: "POST", path: `/planned-transactions/${id}/commit/`, entity: "planned" });
+    await queueOutbox({
+      method: request.method,
+      path: request.path,
+      body: request.body,
+      localId,
+      entity: "transactions",
+    });
   }
 }
