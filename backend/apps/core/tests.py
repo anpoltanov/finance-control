@@ -70,6 +70,203 @@ class AuthCookieTests(APITestCase):
         self.assertEqual(res.status_code, 401)
         self.assertEqual(res.data["detail"], "Invalid credentials.")
 
+    def test_second_tab_can_reuse_just_rotated_refresh_cookie(self):
+        self.client.post("/api/v1/auth/login/", {"username": "u", "password": "p"}, format="json")
+        old_refresh = self.client.cookies.get("refresh_token").value
+        first = self.client.post("/api/v1/auth/refresh/")
+        self.assertEqual(first.status_code, 200, first.content)
+        new_refresh = self.client.cookies.get("refresh_token").value
+        self.assertNotEqual(new_refresh, old_refresh)
+
+        self.client.cookies["refresh_token"] = old_refresh
+        second = self.client.post("/api/v1/auth/refresh/")
+        self.assertEqual(second.status_code, 200, second.content)
+        self.assertEqual(self.client.cookies.get("refresh_token").value, new_refresh)
+        me = self.client.get("/api/v1/auth/me/")
+        self.assertEqual(me.status_code, 200)
+
+    def test_rotated_refresh_cookie_is_rejected_after_reuse_window(self):
+        self.client.post("/api/v1/auth/login/", {"username": "u", "password": "p"}, format="json")
+        old_refresh = self.client.cookies.get("refresh_token").value
+        self.client.post("/api/v1/auth/refresh/")
+
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from apps.core.models import RefreshTokenReuse
+        from apps.core.token_refresh import hash_refresh_token
+
+        RefreshTokenReuse.objects.filter(pk=hash_refresh_token(old_refresh)).update(
+            created_at=timezone.now() - timedelta(seconds=31)
+        )
+        self.client.cookies["refresh_token"] = old_refresh
+        res = self.client.post("/api/v1/auth/refresh/")
+        self.assertEqual(res.status_code, 401)
+
+    def test_logout_with_pre_rotation_cookie_revokes_successor_after_reuse_window(self):
+        self.client.post("/api/v1/auth/login/", {"username": "u", "password": "p"}, format="json")
+        old_refresh = self.client.cookies.get("refresh_token").value
+        self.client.post("/api/v1/auth/refresh/")
+        successor = self.client.cookies.get("refresh_token").value
+
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from apps.core.models import RefreshTokenReuse
+        from apps.core.token_refresh import hash_refresh_token
+
+        RefreshTokenReuse.objects.filter(pk=hash_refresh_token(old_refresh)).update(
+            created_at=timezone.now() - timedelta(seconds=31)
+        )
+        self.client.cookies["refresh_token"] = old_refresh
+        self.assertEqual(self.client.post("/api/v1/auth/refresh/").status_code, 401)
+
+        self.client.cookies["refresh_token"] = old_refresh
+        self.client.post("/api/v1/auth/logout/")
+        self.client.cookies["refresh_token"] = successor
+        self.assertEqual(self.client.post("/api/v1/auth/refresh/").status_code, 401)
+
+    def test_logout_with_successor_deletes_parent_reuse_mapping(self):
+        from apps.core.models import RefreshTokenReuse
+        from apps.core.token_refresh import hash_refresh_token
+
+        self.client.post("/api/v1/auth/login/", {"username": "u", "password": "p"}, format="json")
+        old_refresh = self.client.cookies.get("refresh_token").value
+        self.client.post("/api/v1/auth/refresh/")
+        successor = self.client.cookies.get("refresh_token").value
+        self.assertTrue(RefreshTokenReuse.objects.filter(pk=hash_refresh_token(old_refresh)).exists())
+
+        self.client.cookies["refresh_token"] = successor
+        self.client.post("/api/v1/auth/logout/")
+        self.assertFalse(RefreshTokenReuse.objects.filter(pk=hash_refresh_token(old_refresh)).exists())
+        self.client.cookies["refresh_token"] = old_refresh
+        self.assertEqual(self.client.post("/api/v1/auth/refresh/").status_code, 401)
+
+    def test_logout_invalidates_reuse_of_previous_refresh_cookie(self):
+        self.client.post("/api/v1/auth/login/", {"username": "u", "password": "p"}, format="json")
+        old_refresh = self.client.cookies.get("refresh_token").value
+        self.client.post("/api/v1/auth/refresh/")
+        self.client.post("/api/v1/auth/logout/")
+        self.client.cookies["refresh_token"] = old_refresh
+        res = self.client.post("/api/v1/auth/refresh/")
+        self.assertEqual(res.status_code, 401)
+
+    def test_logout_with_pre_rotation_cookie_revokes_successor(self):
+        self.client.post("/api/v1/auth/login/", {"username": "u", "password": "p"}, format="json")
+        old_refresh = self.client.cookies.get("refresh_token").value
+        self.client.post("/api/v1/auth/refresh/")
+        successor = self.client.cookies.get("refresh_token").value
+        self.assertNotEqual(successor, old_refresh)
+
+        self.client.cookies["refresh_token"] = old_refresh
+        self.client.post("/api/v1/auth/logout/")
+
+        self.client.cookies["refresh_token"] = old_refresh
+        self.assertEqual(self.client.post("/api/v1/auth/refresh/").status_code, 401)
+        self.client.cookies["refresh_token"] = successor
+        self.assertEqual(self.client.post("/api/v1/auth/refresh/").status_code, 401)
+
+    def test_revoke_blacklists_successor_before_deleting_reuse_row(self):
+        from unittest.mock import patch
+
+        from apps.core.models import RefreshTokenReuse
+        from apps.core import token_refresh as tr
+
+        self.client.post("/api/v1/auth/login/", {"username": "u", "password": "p"}, format="json")
+        old_refresh = self.client.cookies.get("refresh_token").value
+        self.client.post("/api/v1/auth/refresh/")
+        successor = self.client.cookies.get("refresh_token").value
+        key = tr.hash_refresh_token(old_refresh)
+        real = tr._blacklist_refresh
+        blacklisted = []
+
+        def spy(raw):
+            if raw == successor:
+                self.assertTrue(RefreshTokenReuse.objects.filter(pk=key).exists())
+            blacklisted.append(raw)
+            return real(raw)
+
+        with patch.object(tr, "_blacklist_refresh", side_effect=spy):
+            tr.revoke_refresh_cookie(old_refresh)
+
+        self.assertIn(successor, blacklisted)
+        self.assertFalse(RefreshTokenReuse.objects.filter(pk=key).exists())
+        self.client.cookies["refresh_token"] = successor
+        self.assertEqual(self.client.post("/api/v1/auth/refresh/").status_code, 401)
+
+    def test_reuse_locks_successor_row_before_minting(self):
+        from unittest.mock import patch
+
+        from apps.core import token_refresh as tr
+
+        self.client.post("/api/v1/auth/login/", {"username": "u", "password": "p"}, format="json")
+        old_refresh = self.client.cookies.get("refresh_token").value
+        self.client.post("/api/v1/auth/refresh/")
+        successor = self.client.cookies.get("refresh_token").value
+        calls: list[set[str]] = []
+        real = tr._lock_hashes
+
+        def spy(hashes):
+            calls.append(set(hashes))
+            return real(hashes)
+
+        with patch.object(tr, "_lock_hashes", side_effect=spy):
+            data = tr.rotate_or_reuse_refresh(old_refresh)
+
+        self.assertIsNotNone(data)
+        self.assertTrue(
+            any(
+                tr.hash_refresh_token(old_refresh) in locked_hashes
+                and tr.hash_refresh_token(successor) in locked_hashes
+                for locked_hashes in calls
+            )
+        )
+
+    def test_successor_lock_placeholder_does_not_poison_reuse_ttl(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from apps.core.models import RefreshTokenReuse
+        from apps.core.token_refresh import hash_refresh_token
+
+        self.client.post("/api/v1/auth/login/", {"username": "u", "password": "p"}, format="json")
+        self.client.post("/api/v1/auth/refresh/")
+        successor = self.client.cookies.get("refresh_token").value
+        RefreshTokenReuse.objects.update_or_create(
+            token_hash=hash_refresh_token(successor),
+            defaults={"refresh": ""},
+        )
+        RefreshTokenReuse.objects.filter(pk=hash_refresh_token(successor)).update(
+            created_at=timezone.now() - timedelta(seconds=31)
+        )
+
+        self.client.cookies["refresh_token"] = successor
+        first = self.client.post("/api/v1/auth/refresh/")
+        self.assertEqual(first.status_code, 200, first.content)
+        rotated = self.client.cookies.get("refresh_token").value
+        self.assertNotEqual(rotated, successor)
+
+        self.client.cookies["refresh_token"] = successor
+        second = self.client.post("/api/v1/auth/refresh/")
+        self.assertEqual(second.status_code, 200, second.content)
+        self.assertEqual(self.client.cookies.get("refresh_token").value, rotated)
+
+    def test_reuse_of_blacklisted_successor_returns_401_not_500(self):
+        from unittest.mock import patch
+
+        from rest_framework_simplejwt.exceptions import TokenError
+
+        self.client.post("/api/v1/auth/login/", {"username": "u", "password": "p"}, format="json")
+        old_refresh = self.client.cookies.get("refresh_token").value
+        self.client.post("/api/v1/auth/refresh/")
+        self.client.cookies["refresh_token"] = old_refresh
+        with patch("apps.core.token_refresh.RefreshToken", side_effect=TokenError("blacklisted")):
+            res = self.client.post("/api/v1/auth/refresh/")
+        self.assertEqual(res.status_code, 401)
+
 
 class LoginThrottleTests(APITestCase):
     def test_login_view_uses_login_throttle(self):
