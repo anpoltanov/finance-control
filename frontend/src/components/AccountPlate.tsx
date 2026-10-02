@@ -10,9 +10,10 @@ interface AccountPlateProps {
   onClick?: () => void;
   actions?: ReactNode;
   compact?: boolean;
+  showBadges?: boolean;
 }
 
-export default function AccountPlate({ account, onClick, actions, compact = true }: AccountPlateProps) {
+export default function AccountPlate({ account, onClick, actions, compact = true, showBadges = false }: AccountPlateProps) {
   const { t } = useTranslation();
   const style: CSSProperties = {
     borderLeft: `4px solid ${account.color}`,
@@ -45,7 +46,7 @@ export default function AccountPlate({ account, onClick, actions, compact = true
             <strong className="account-plate-title">{account.title}</strong>
           </div>
           <p className="account-plate-balance">{formatCurrency(account.balance, account.currency_code)}</p>
-          {(account.archived || account.exclude_from_statistics) && (
+          {showBadges && (account.archived || account.exclude_from_statistics) && (
             <div className="account-plate-badges">
               {account.archived && <span className="badge">{t("accounts.archived")}</span>}
               {account.exclude_from_statistics && (

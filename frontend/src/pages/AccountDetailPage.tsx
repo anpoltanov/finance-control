@@ -37,7 +37,17 @@ export default function AccountDetailPage() {
               <GlyphIcon icon={account.icon} fallback="credit_card" />
             </span>
             <div>
-              <h2>{account.title}</h2>
+              <div className="account-detail-heading">
+                <h2>{account.title}</h2>
+                {(account.archived || account.exclude_from_statistics) && (
+                  <div className="account-detail-badges">
+                    {account.archived && <span className="badge">{t("accounts.archived")}</span>}
+                    {account.exclude_from_statistics && (
+                      <span className="badge">{t("accounts.excludedBadge")}</span>
+                    )}
+                  </div>
+                )}
+              </div>
               <p className="account-detail-balance">
                 {formatCurrency(account.balance, account.currency_code)}
               </p>

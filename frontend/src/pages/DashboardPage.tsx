@@ -37,7 +37,7 @@ export default function DashboardPage() {
             ))}
           </div>
           {data.plates.length === 0 && <p className="muted-text">{t("accounts.empty")}</p>}
-          <DashboardWidgets data={data} from={range.fromParam} to={range.toParam} />
+          <DashboardWidgets data={data} from={range.fromParam} to={range.toParam} periodLabel={range.label} />
         </>
       )}
     </div>

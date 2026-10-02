@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import InitialSyncGate from "./components/InitialSyncGate";
 import Layout from "./components/Layout";
 import { useOfflineSync } from "./hooks/useOfflineSync";
 import LoginPage from "./pages/LoginPage";
@@ -16,12 +17,15 @@ import { api } from "./api/client";
 function Protected({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
   const [ok, setOk] = useState<boolean | null>(null);
-  useOfflineSync();
+  const sync = useOfflineSync();
   useEffect(() => {
     api.me().then(() => setOk(true)).catch(() => setOk(false));
   }, []);
-  if (ok === null) return <p style={{ padding: "2rem" }}>{t("common.loading")}</p>;
+  if (ok === null || sync.status === "checking") return <p style={{ padding: "2rem" }}>{t("common.loading")}</p>;
   if (!ok) return <Navigate to="/login" replace />;
+  if (sync.status === "syncing" || sync.status === "error") {
+    return <InitialSyncGate failed={sync.status === "error"} onRetry={sync.retry} />;
+  }
   return <>{children}</>;
 }
 

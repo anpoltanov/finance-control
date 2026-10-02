@@ -1,9 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { api, apiFetch, type PlannedTransaction, type Transaction } from "../api/client";
 import { applySyncPayload, clearLocalCache, flushOutbox, getLastSyncedAt } from "../db/index";
 
 const SYNC_INTERVAL_MS = 60_000;
 const PERMANENT_FAILURE = new Set([400, 404, 409, 422]);
+
+export type InitialSyncStatus = "checking" | "syncing" | "error" | "ready";
 
 export async function runSync(): Promise<void> {
   if (!navigator.onLine) return;
@@ -41,24 +43,81 @@ export async function resetLocalCache(): Promise<void> {
   await applySyncPayload(payload);
 }
 
-export function useOfflineSync() {
+export function useOfflineSync(): { status: InitialSyncStatus; retry: () => void } {
+  const [status, setStatus] = useState<InitialSyncStatus>("checking");
+  const [retryToken, setRetryToken] = useState(0);
+
   useEffect(() => {
-    function sync() {
+    let cancelled = false;
+    let running = false;
+    let needsInitial = false;
+
+    async function pullInitial() {
+      if (running) return;
+      running = true;
+      if (!cancelled) setStatus("syncing");
+      try {
+        if (!navigator.onLine) {
+          if (!cancelled) setStatus("error");
+          return;
+        }
+        await runSync();
+        const since = await getLastSyncedAt();
+        if (cancelled) return;
+        if (since) {
+          needsInitial = false;
+          setStatus("ready");
+        } else {
+          setStatus("error");
+        }
+      } catch {
+        if (!cancelled) setStatus("error");
+      } finally {
+        running = false;
+      }
+    }
+
+    async function start() {
+      const since = await getLastSyncedAt();
+      if (cancelled) return;
+      if (!since) {
+        needsInitial = true;
+        await pullInitial();
+        return;
+      }
+      needsInitial = false;
+      setStatus("ready");
       runSync().catch(() => {
         /* retry on next trigger */
       });
     }
 
-    sync();
-    const interval = window.setInterval(sync, SYNC_INTERVAL_MS);
-    window.addEventListener("online", sync);
-    window.addEventListener("focus", sync);
+    function onBackground() {
+      if (needsInitial) {
+        void pullInitial();
+        return;
+      }
+      runSync().catch(() => {
+        /* retry on next trigger */
+      });
+    }
+
+    void start();
+    const interval = window.setInterval(onBackground, SYNC_INTERVAL_MS);
+    window.addEventListener("online", onBackground);
+    window.addEventListener("focus", onBackground);
     return () => {
+      cancelled = true;
       window.clearInterval(interval);
-      window.removeEventListener("online", sync);
-      window.removeEventListener("focus", sync);
+      window.removeEventListener("online", onBackground);
+      window.removeEventListener("focus", onBackground);
     };
-  }, []);
+  }, [retryToken]);
+
+  return {
+    status,
+    retry: () => setRetryToken((token) => token + 1),
+  };
 }
 
 export { queueOutbox } from "../db/index";
