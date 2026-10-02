@@ -127,9 +127,6 @@ function assembleNumeric(intPart: string, fracPart: string, seenSep: boolean, ne
 
 export function shouldParseAsPaste(raw: string, previousDisplay: string): boolean {
   if (/[^\d.,\-\s\u00a0\u202f]/.test(raw)) return true;
-  const compact = raw.replace(GROUPING, "");
-  if (compact.includes(",") && compact.includes(".")) return true;
-  if (countChar(compact, ",") > 1 || countChar(compact, ".") > 1) return true;
   return raw.length - previousDisplay.length > 1;
 }
 

@@ -1,6 +1,7 @@
 import type { Transaction } from "../api/client";
 import { useTranslation } from "react-i18next";
 import { formatDate, formatSignedCurrency } from "../utils/format";
+import { localDayKey, parseApiDate } from "../utils/instants";
 import { signedNetContribution } from "../utils/transactionTotals";
 import { formatSignedAmount, transferRoute } from "../utils/transactionDisplay";
 import GlyphIcon from "./GlyphIcon";
@@ -20,19 +21,16 @@ interface DayGroup {
   items: Transaction[];
 }
 
-function dayKey(iso: string): string {
-  return iso.slice(0, 10);
-}
-
 function groupByDay(transactions: Transaction[], perspectiveAccountId?: number): DayGroup[] {
   const map = new Map<string, DayGroup>();
   for (const tx of transactions) {
-    const key = dayKey(tx.date);
+    const when = parseApiDate(tx.date);
+    const key = localDayKey(when);
     let group = map.get(key);
     if (!group) {
       group = {
         key,
-        label: formatDate(key, { weekday: "short", day: "numeric", month: "long", year: "numeric" }),
+        label: formatDate(when, { weekday: "short", day: "numeric", month: "long", year: "numeric" }),
         net: 0,
         currency: tx.currency_code || "RUB",
         items: [],
@@ -47,7 +45,7 @@ function groupByDay(transactions: Transaction[], perspectiveAccountId?: number):
 }
 
 function formatTime(iso: string): string {
-  const d = new Date(iso);
+  const d = parseApiDate(iso);
   if (Number.isNaN(d.getTime())) return "";
   return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 }

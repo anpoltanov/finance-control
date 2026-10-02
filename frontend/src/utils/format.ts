@@ -1,16 +1,24 @@
 import { formatLocale } from "../i18n";
+import { parseApiDate } from "./instants";
 
 export function formatNumber(value: number, options?: Intl.NumberFormatOptions): string {
   return value.toLocaleString(formatLocale(), options);
 }
 
 export function formatDate(value: Date | string, options?: Intl.DateTimeFormatOptions): string {
-  const date = typeof value === "string" ? new Date(value) : value;
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value.trim())) {
+    const [year, month, day] = value.trim().split("-").map(Number);
+    return new Date(year, month - 1, day).toLocaleDateString(formatLocale(), options);
+  }
+  const date = typeof value === "string" ? parseApiDate(value) : value;
   return date.toLocaleDateString(formatLocale(), options);
 }
 
 export function formatDateTime(value: Date | string, options?: Intl.DateTimeFormatOptions): string {
-  const date = typeof value === "string" ? new Date(value) : value;
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value.trim())) {
+    return formatDate(value, options);
+  }
+  const date = typeof value === "string" ? parseApiDate(value) : value;
   return date.toLocaleString(formatLocale(), options);
 }
 

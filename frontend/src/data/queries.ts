@@ -1,6 +1,7 @@
 import type { Account, Category, Tag, Transaction } from "../api/client";
 import { db } from "../db";
 import { categoryFilterIds, resolveCategoryColor } from "../utils/categoryTree";
+import { localRangeBoundMs, parseApiDate } from "../utils/instants";
 
 export interface TransactionFilters {
   account?: string | number;
@@ -20,8 +21,8 @@ export interface TransactionFilters {
   sort?: "date_desc" | "date_asc" | "amount_desc" | "amount_asc";
 }
 
-function parseDate(value: string): number {
-  return new Date(value).getTime();
+function txInstant(value: string): number {
+  return parseApiDate(value).getTime();
 }
 
 export async function listAccounts(): Promise<Account[]> {
@@ -149,12 +150,12 @@ export async function listTransactions(filters: TransactionFilters = {}): Promis
     txs = txs.filter((tx) => (tx.tag_ids || []).includes(tagId));
   }
   if (filters.date_from) {
-    const from = parseDate(filters.date_from);
-    txs = txs.filter((tx) => parseDate(tx.date) >= from);
+    const from = localRangeBoundMs(filters.date_from, "start");
+    txs = txs.filter((tx) => txInstant(tx.date) >= from);
   }
   if (filters.date_to) {
-    const to = parseDate(filters.date_to);
-    txs = txs.filter((tx) => parseDate(tx.date) <= to);
+    const to = localRangeBoundMs(filters.date_to, "end");
+    txs = txs.filter((tx) => txInstant(tx.date) <= to);
   }
   if (filters.hide_transfers === true || filters.hide_transfers === "1" || filters.hide_transfers === "true") {
     txs = txs.filter((tx) => tx.type !== "transfer");
@@ -187,10 +188,10 @@ export async function listTransactions(filters: TransactionFilters = {}): Promis
 
   const sort = filters.sort || "date_desc";
   txs.sort((a, b) => {
-    if (sort === "date_asc") return parseDate(a.date) - parseDate(b.date) || a.id - b.id;
+    if (sort === "date_asc") return txInstant(a.date) - txInstant(b.date) || a.id - b.id;
     if (sort === "amount_desc") return parseFloat(b.amount) - parseFloat(a.amount) || b.id - a.id;
     if (sort === "amount_asc") return parseFloat(a.amount) - parseFloat(b.amount) || a.id - b.id;
-    return parseDate(b.date) - parseDate(a.date) || b.id - a.id;
+    return txInstant(b.date) - txInstant(a.date) || b.id - a.id;
   });
 
   return Promise.all(txs.map((tx) => enrichTransaction(tx, accounts, categories, tags)));

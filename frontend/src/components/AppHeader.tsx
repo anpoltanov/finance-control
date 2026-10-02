@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
+import { clearLocalCache } from "../db";
 import { useAsyncAction } from "../hooks/useAsyncAction";
 import { useAddTransaction } from "../context/AddTransactionContext";
 import { setLocale, type AppLocale } from "../i18n";
@@ -42,6 +43,8 @@ export default function AppHeader() {
   function logout() {
     void run(async () => {
       await api.logout();
+      await clearLocalCache();
+      if (typeof caches !== "undefined") await caches.delete("api-cache");
       navigate("/login");
     });
   }

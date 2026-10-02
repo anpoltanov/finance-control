@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from apps.ledger.models import Account, Category, Tag, Transaction
-from apps.ledger.serializers import assign_tags, set_many_related_queryset, user_owned_qs
+from apps.ledger.serializers import InstantDateTimeField, assign_tags, set_many_related_queryset, user_owned_qs
 from apps.planning.models import PlannedTransaction
 
 
@@ -18,7 +18,7 @@ class PlannedCommitSerializer(serializers.Serializer):
     )
     amount = serializers.DecimalField(max_digits=18, decimal_places=2, required=False)
     category = serializers.PrimaryKeyRelatedField(queryset=Category.objects.none(), required=False, allow_null=True)
-    date = serializers.DateTimeField(required=False)
+    date = InstantDateTimeField(required=False)
     notes = serializers.CharField(required=False, allow_blank=True)
     recipient = serializers.CharField(required=False, allow_blank=True)
     status = serializers.ChoiceField(choices=Transaction.STATUS_CHOICES, required=False)

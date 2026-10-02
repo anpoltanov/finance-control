@@ -1,6 +1,7 @@
 import type { Budget, BudgetStatus, ReportSummary } from "../api/client";
 import { db } from "../db";
 import { classifyCashFlow } from "../utils/classify";
+import { localDayKey, localRangeBoundMs, parseApiDate } from "../utils/instants";
 import { expandCategoryIds, resolveCategoryColor } from "../utils/categoryTree";
 
 function addMonths(date: Date, months: number): Date {
@@ -50,7 +51,7 @@ async function spentInPeriod(budget: Budget, periodStart: Date, periodEnd: Date)
     .filter((tx) => {
       if (tx.type === "transfer") return false;
       if (excluded.has(tx.account)) return false;
-      const t = new Date(tx.date).getTime();
+      const t = parseApiDate(tx.date).getTime();
       if (t < startMs || t > endMs) return false;
       if (categorySet) {
         return tx.category != null && categorySet.has(tx.category);
@@ -106,12 +107,12 @@ export async function computeReportSummary(from?: string, to?: string): Promise<
   let txs = await db.transactions.toArray();
   txs = txs.filter((tx) => !excluded.has(tx.account));
   if (from) {
-    const fromMs = new Date(from).getTime();
-    txs = txs.filter((tx) => new Date(tx.date).getTime() >= fromMs);
+    const fromMs = localRangeBoundMs(from, "start");
+    txs = txs.filter((tx) => parseApiDate(tx.date).getTime() >= fromMs);
   }
   if (to) {
-    const toMs = new Date(to).getTime();
-    txs = txs.filter((tx) => new Date(tx.date).getTime() <= toMs);
+    const toMs = localRangeBoundMs(to, "end");
+    txs = txs.filter((tx) => parseApiDate(tx.date).getTime() <= toMs);
   }
 
   const categories = await db.categories.toArray();
@@ -129,7 +130,7 @@ export async function computeReportSummary(from?: string, to?: string): Promise<
       byCategoryMap.set(tx.category, (byCategoryMap.get(tx.category) || 0) + classified.expense);
     }
     if (classified.income !== 0 || classified.expense !== 0) {
-      const monthKey = tx.date.slice(0, 7);
+      const monthKey = localDayKey(parseApiDate(tx.date)).slice(0, 7);
       const bucket = monthlyMap.get(monthKey) || { expense: 0, income: 0 };
       bucket.income += classified.income;
       bucket.expense += classified.expense;

@@ -1,7 +1,16 @@
+from django.utils import timezone
 from rest_framework import serializers
 
 from apps.ledger.models import Account, Category, Tag, Transaction
 from apps.planning.models import PlannedTransaction
+
+
+class InstantDateTimeField(serializers.DateTimeField):
+    """Keep an absolute instant. Naive input uses the active timezone, and responses include its offset."""
+
+    def enforce_timezone(self, value):
+        self.timezone = timezone.get_current_timezone()
+        return super().enforce_timezone(value)
 
 
 def set_related_queryset(field, queryset):
@@ -88,6 +97,7 @@ class TagSerializer(serializers.ModelSerializer):
 
 
 class TransactionSerializer(serializers.ModelSerializer):
+    date = InstantDateTimeField()
     tag_ids = serializers.PrimaryKeyRelatedField(
         source="tags", queryset=Tag.objects.none(), many=True, required=False
     )

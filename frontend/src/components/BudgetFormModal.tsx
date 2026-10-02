@@ -3,6 +3,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { useTranslation } from "react-i18next";
 import type { Budget } from "../api/client";
 import { listCategories } from "../data/queries";
+import { localTodayYmd } from "../utils/instants";
 import { createBudget, updateBudget } from "../data/repository";
 import CategoryTreePicker from "./CategoryTreePicker";
 import ModalForm from "./ModalForm";
@@ -18,7 +19,7 @@ interface BudgetFormModalProps {
 const empty = () => ({
   name: "",
   amount: "",
-  start_date: new Date().toISOString().slice(0, 10),
+  start_date: localTodayYmd(),
   period: "monthly" as "monthly" | "yearly",
   rollover_enabled: false,
   category_ids: [] as number[],

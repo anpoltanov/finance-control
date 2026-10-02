@@ -72,6 +72,12 @@ describe("pasted numeric input", () => {
     assert.equal(applyNumericChange("12,5", "12", {}), "12.5");
   });
 
+  it("keeps the amount when one extra decimal separator is typed", () => {
+    assert.equal(applyNumericChange("12.5.", "12.5", {}), "12.5");
+    assert.equal(applyNumericChange("12.5,", "12.5", {}), "12.5");
+    assert.equal(applyNumericChange("12..5", "12.5", {}), "12.5");
+  });
+
   it("drops a trailing separator when the field is left", () => {
     assert.equal(finalizeNumericInput("12."), "12");
     assert.equal(finalizeNumericInput("-"), "");

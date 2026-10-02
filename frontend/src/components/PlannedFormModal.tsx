@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { PlannedTransaction } from "../api/client";
 import { listAccounts, listCategories, listTags } from "../data/queries";
 import { createPlanned, deletePlanned, updatePlanned } from "../data/repository";
+import { localTodayYmd } from "../utils/instants";
 import { picksFromTransfer, resolveTransferPicks, type TransferPicks } from "../utils/transferPicks";
 import ModalForm from "./ModalForm";
 import TransactionFields, { copyTagIds, type TxFieldValues } from "./TransactionFields";
@@ -33,7 +34,7 @@ const empty = (accountId = 0): PlannedFormValues => ({
   recipient: "",
   notes: "",
   tag_ids: copyTagIds(),
-  next_occurrence_date: new Date().toISOString().slice(0, 10),
+  next_occurrence_date: localTodayYmd(),
   repeat_rule: "once",
   autocommit: false,
   to_account: null,
