@@ -3,6 +3,7 @@ import { db, nextTempId, queueOutbox } from "../db";
 import { offlineCommitOutbox, type PlannedCommitOverrides } from "./commitRequest";
 import { enrichTransaction } from "./queries";
 import { computeBudgetStatus } from "./reports";
+import { localInputToIso, localTodayYmd } from "../utils/instants";
 
 async function rememberTags(record: { tag_ids?: number[]; tag_names?: string[] } | null | undefined) {
   const ids = record?.tag_ids || [];
@@ -230,7 +231,7 @@ export async function createBudget(data: Partial<Budget>): Promise<Budget> {
     id,
     name: data.name || "",
     amount: data.amount || "0",
-    start_date: data.start_date || new Date().toISOString().slice(0, 10),
+    start_date: data.start_date || localTodayYmd(),
     period: data.period || "monthly",
     rollover_enabled: data.rollover_enabled || false,
     category_ids: data.category_ids || [],
@@ -291,7 +292,7 @@ export async function createPlanned(data: Partial<PlannedTransaction>): Promise<
     transfer_kind: data.transfer_kind ?? null,
     amount: String(data.amount || "0"),
     category: data.category ?? null,
-    next_occurrence_date: data.next_occurrence_date || new Date().toISOString().slice(0, 10),
+    next_occurrence_date: data.next_occurrence_date || localTodayYmd(),
     end_date: data.end_date ?? null,
     repeat_rule: data.repeat_rule || "once",
     autocommit: data.autocommit || false,
@@ -355,7 +356,7 @@ export async function commitPlanned(id: number, overrides?: PlannedCommitOverrid
   const planned = await db.planned.get(id);
   if (!planned) return;
   const localId = await nextTempId();
-  const postedDate = overrides?.date || `${planned.next_occurrence_date}T00:00:00`;
+  const postedDate = overrides?.date || localInputToIso(`${planned.next_occurrence_date.slice(0, 10)}T00:00`);
   const local = await enrichTransaction({
     id: localId,
     type: overrides?.type || planned.type,

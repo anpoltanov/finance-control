@@ -1,6 +1,7 @@
 import type { Account, Category, Transaction } from "../api/client";
 import { db } from "../db";
 import { classifyCashFlow } from "../utils/classify";
+import { parseApiDate } from "../utils/instants";
 import { listAccounts } from "./queries";
 import { getChildren, resolveCategoryColor } from "../utils/categoryTree";
 
@@ -81,8 +82,12 @@ function statisticalDelta(tx: Transaction, accounts: Map<number, Account>): numb
   return 0;
 }
 
+function txInstant(tx: Transaction): number {
+  return parseApiDate(tx.date).getTime();
+}
+
 function inRange(tx: Transaction, fromMs: number, toMs: number): boolean {
-  const t = new Date(tx.date).getTime();
+  const t = txInstant(tx);
   return t >= fromMs && t <= toMs;
 }
 
@@ -119,7 +124,7 @@ function statisticalBalanceAt(accounts: Account[], txs: Transaction[], beforeMs:
     total += parseFloat(account.initial_balance || "0") || 0;
   }
   for (const tx of txs) {
-    if (new Date(tx.date).getTime() >= beforeMs) continue;
+    if (txInstant(tx) >= beforeMs) continue;
     total += statisticalDelta(tx, byId);
   }
   return total;
@@ -205,7 +210,7 @@ export async function loadDashboard(from?: string, to?: string): Promise<Dashboa
   const categoriesById = new Map(categories.map((c) => [c.id, c]));
   const today = new Date();
   const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const txTimes = txs.map((tx) => new Date(tx.date).getTime()).filter((t) => Number.isFinite(t));
+  const txTimes = txs.map((tx) => txInstant(tx)).filter((t) => Number.isFinite(t));
   const earliest = txTimes.length ? Math.min(...txTimes) : todayStart.getTime();
   const fromMs = from ? parseYmd(from).getTime() : earliest;
   const toMs = to ? rangeEndMs(to) : new Date(todayStart.getFullYear(), todayStart.getMonth(), todayStart.getDate(), 23, 59, 59, 999).getTime();
@@ -245,7 +250,7 @@ export async function loadDashboard(from?: string, to?: string): Promise<Dashboa
     const dayStart = day.getTime();
     const dayEnd = addDays(day, step).getTime();
     for (const tx of txs) {
-      const t = new Date(tx.date).getTime();
+      const t = txInstant(tx);
       if (t >= dayStart && t < dayEnd) running += statisticalDelta(tx, byId);
     }
     labels.push(toYmd(day));

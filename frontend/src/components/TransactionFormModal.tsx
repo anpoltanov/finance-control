@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { Transaction } from "../api/client";
 import { listAccounts, listCategories, listTags } from "../data/queries";
 import { createTransaction, deleteTransaction, updateTransaction } from "../data/repository";
+import { localInputToIso, parseApiDate, toDateTimeLocalValue } from "../utils/instants";
 import { picksFromTransfer, resolveTransferPicks, type TransferPicks } from "../utils/transferPicks";
 import ModalForm from "./ModalForm";
 import TransactionFields, { copyTagIds, type TxFieldValues } from "./TransactionFields";
@@ -22,7 +23,7 @@ const defaultValues = (initial?: Partial<TransactionFormValues>): TransactionFor
   return {
     type: "expense",
     amount: "",
-    date: new Date().toISOString().slice(0, 16),
+    date: toDateTimeLocalValue(new Date()),
     status: "cleared",
     notes: "",
     recipient: "",
@@ -45,7 +46,7 @@ function valuesFromTransaction(tx: Transaction): TransactionFormValues {
     recipient: tx.recipient || "",
     notes: tx.notes || "",
     tag_ids: copyTagIds(tx.tag_ids),
-    date: tx.date.slice(0, 16),
+    date: toDateTimeLocalValue(parseApiDate(tx.date)),
     status: tx.status,
     payment_type: tx.payment_type || "",
     currency_code: tx.currency_code,
@@ -97,6 +98,7 @@ export default function TransactionFormModal({
     const { account: _pickedAccount, ...rest } = form;
     const payload: Partial<Transaction> = {
       ...rest,
+      date: localInputToIso(form.date),
       tag_ids: copyTagIds(form.tag_ids),
       category: form.category ? Number(form.category) : null,
     };

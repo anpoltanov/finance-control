@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone as datetime_timezone
 from decimal import Decimal
 
 from django.contrib.auth.models import User
@@ -314,3 +314,35 @@ class CrossUserForeignKeyTests(APITestCase):
         self.client.force_authenticate(self.owner)
         res = self.client.get("/api/v1/transactions/", {"date_from": "nope"})
         self.assertEqual(res.status_code, 400)
+
+
+class TransactionInstantTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="tz", password="p")
+        self.client.force_authenticate(self.user)
+        self.account = Account.objects.create(user=self.user, title="Cash")
+
+    def _post(self, date):
+        res = self.client.post(
+            "/api/v1/transactions/",
+            {
+                "type": "expense",
+                "account": self.account.id,
+                "amount": "10.00",
+                "date": date,
+                "currency_code": "RUB",
+            },
+            format="json",
+        )
+        self.assertEqual(res.status_code, 201, res.content)
+        return res
+
+    def test_moscow_wall_clock_and_offset_store_the_same_instant(self):
+        expected = datetime(2026, 10, 2, 10, 0, tzinfo=datetime_timezone.utc)
+        for raw in ("2026-10-02T13:00:00+03:00", "2026-10-02T13:00:00"):
+            res = self._post(raw)
+            saved = Transaction.objects.get(pk=res.data["id"])
+            self.assertEqual(saved.date, expected)
+            returned = datetime.fromisoformat(res.data["date"].replace("Z", "+00:00"))
+            self.assertEqual(returned, expected)
+            self.assertTrue(res.data["date"].endswith("+03:00"), res.data["date"])

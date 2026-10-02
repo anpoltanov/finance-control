@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { PlannedTransaction, Transaction } from "../api/client";
 import type { PlannedCommitOverrides } from "../data/commitRequest";
 import { commitPlanned } from "../data/repository";
+import { localInputToIso } from "../utils/instants";
 import { listAccounts, listCategories, listTags } from "../data/queries";
 import { picksFromTransfer, resolveTransferPicks, type TransferPicks } from "../utils/transferPicks";
 import ModalForm from "./ModalForm";
@@ -69,7 +70,7 @@ export default function PlannedReviewModal({ open, planned, onClose }: PlannedRe
       type: form.type,
       amount: form.amount,
       category: form.category ? Number(form.category) : null,
-      date: form.date.length === 16 ? `${form.date}:00` : form.date,
+      date: localInputToIso(form.date),
       notes: form.notes,
       recipient: form.recipient,
       status: form.status,
