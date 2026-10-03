@@ -19,12 +19,16 @@ export interface DashboardSnapshot {
   expenseByCategory: Map<number, number>;
   categories: Category[];
   primaryCurrency: string;
+  /** Inclusive calendar days covered by the selected period. */
+  periodDays: number;
 }
 
 export interface CashFlow {
   income: number;
   expense: number;
   net: number;
+  incomeCount: number;
+  expenseCount: number;
 }
 
 export interface ExpenseSlice {
@@ -100,6 +104,8 @@ function cashFlowFor(
 ): CashFlow {
   let income = 0;
   let expense = 0;
+  let incomeCount = 0;
+  let expenseCount = 0;
   for (const tx of txs) {
     if (!inRange(tx, fromMs, toMs)) continue;
     const acc = accounts.get(tx.account);
@@ -107,8 +113,18 @@ function cashFlowFor(
     const classified = classifyCashFlow(tx, categoriesById);
     income += classified.income;
     expense += classified.expense;
+    if (classified.income !== 0) incomeCount += 1;
+    if (classified.expense !== 0) expenseCount += 1;
   }
-  return { income, expense, net: income - expense };
+  return { income, expense, net: income - expense, incomeCount, expenseCount };
+}
+
+function inclusiveDayCount(fromMs: number, toMs: number): number {
+  const start = new Date(fromMs);
+  const end = new Date(toMs);
+  const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+  return Math.max(1, Math.round((endDay.getTime() - startDay.getTime()) / 86400000) + 1);
 }
 
 function rangeEndMs(toYmdValue: string): number {
@@ -235,7 +251,8 @@ export async function loadDashboard(from?: string, to?: string): Promise<Dashboa
   const period = cashFlowFor(txs, byId, categoriesById, fromMs, toMs);
   const previousPeriod = hasBoundedRange
     ? cashFlowFor(txs, byId, categoriesById, prevFromMs, prevToMs)
-    : { income: 0, expense: 0, net: 0 };
+    : { income: 0, expense: 0, net: 0, incomeCount: 0, expenseCount: 0 };
+  const periodDays = inclusiveDayCount(fromMs, toMs);
 
   let running = statisticalBalanceAt(accounts, txs, fromMs);
   const labels: string[] = [];
@@ -283,5 +300,6 @@ export async function loadDashboard(from?: string, to?: string): Promise<Dashboa
     expenseByCategory,
     categories,
     primaryCurrency,
+    periodDays,
   };
 }

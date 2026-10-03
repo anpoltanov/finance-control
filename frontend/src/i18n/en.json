@@ -166,7 +166,16 @@
     "periodExpenses": "Expenses",
     "balanceDynamics": "Balance dynamics",
     "cashFlow": "Cash flow",
-    "expensesStructure": "Expense structure"
+    "expensesStructure": "Expense structure",
+    "flowCount": "Count",
+    "avgPerDay": "Average (per day)",
+    "avgPerTx": "Average (per transaction)",
+    "summary": "Summary"
+  },
+  "sync": {
+    "initial": "Syncing your data…",
+    "failed": "Could not sync your data.",
+    "retry": "Retry"
   },
   "accounts": {
     "title": "Accounts",

@@ -19,7 +19,7 @@ import { useTranslation } from "react-i18next";
 import type { ReportSummary } from "../../api/client";
 import { expenseSlices, pctChange, type DashboardSnapshot } from "../../data/dashboard";
 import { computeReportSummary } from "../../data/reports";
-import { formatCurrency, chartNumericValue } from "../../utils/format";
+import { formatCurrency, formatNumber, chartNumericValue } from "../../utils/format";
 import GlyphIcon from "../GlyphIcon";
 import SemiGauge, { PctBadge, trendColor } from "./SemiGauge";
 
@@ -29,13 +29,14 @@ interface DashboardWidgetsProps {
   data: DashboardSnapshot;
   from?: string;
   to?: string;
+  periodLabel: string;
 }
 
 function gaugeMax(current: number, previous: number): number {
   return Math.max(Math.abs(current), Math.abs(previous), 1);
 }
 
-export default function DashboardWidgets({ data, from, to }: DashboardWidgetsProps) {
+export default function DashboardWidgets({ data, from, to, periodLabel }: DashboardWidgetsProps) {
   const { t, i18n } = useTranslation();
   const currency = data.primaryCurrency;
   const report = useLiveQuery(
@@ -173,25 +174,6 @@ export default function DashboardWidgets({ data, from, to }: DashboardWidgetsPro
         </div>
       </section>
 
-      <section className="card widget-card widget-stat">
-        <h3>{t("reports.income")}</h3>
-        <p className="widget-hero">{report ? formatCurrency(report.income_total, currency) : t("common.loading")}</p>
-      </section>
-      <section className="card widget-card widget-stat">
-        <h3>{t("reports.expense")}</h3>
-        <p className="widget-hero">{report ? formatCurrency(report.expense_total, currency) : t("common.loading")}</p>
-      </section>
-      <section className="card widget-card widget-span">
-        <h3>{t("reports.monthlyTrends")}</h3>
-        {report && report.monthly.length > 0 ? (
-          <div className="widget-chart">
-            <MonthlyBars report={report} currency={currency} />
-          </div>
-        ) : (
-          <p className="muted-text">{t("common.noData")}</p>
-        )}
-      </section>
-
       <section className="card widget-card">
         <div className="widget-header">
           <h3>{t("dashboard.expensesStructure")}</h3>
@@ -246,7 +228,99 @@ export default function DashboardWidgets({ data, from, to }: DashboardWidgetsPro
           </div>
         )}
       </section>
+
+      <PeriodBrief
+        label={periodLabel}
+        income={data.period.income}
+        expense={data.period.expense}
+        incomeCount={data.period.incomeCount}
+        expenseCount={data.period.expenseCount}
+        days={data.periodDays}
+        currency={currency}
+      />
+
+      <section className="card widget-card widget-span">
+        <h3>{t("reports.monthlyTrends")}</h3>
+        {report && report.monthly.length > 0 ? (
+          <div className="widget-chart">
+            <MonthlyBars report={report} currency={currency} />
+          </div>
+        ) : (
+          <p className="muted-text">{t("common.noData")}</p>
+        )}
+      </section>
     </div>
+  );
+}
+
+function expenseAmount(value: number): number {
+  return value === 0 ? 0 : -value;
+}
+
+function PeriodBrief({
+  label,
+  income,
+  expense,
+  incomeCount,
+  expenseCount,
+  days,
+  currency,
+}: {
+  label: string;
+  income: number;
+  expense: number;
+  incomeCount: number;
+  expenseCount: number;
+  days: number;
+  currency: string;
+}) {
+  const { t } = useTranslation();
+  const dayCount = Math.max(1, days);
+  const rows = [
+    {
+      label: t("dashboard.flowCount"),
+      income: formatNumber(incomeCount),
+      expense: formatNumber(expenseCount),
+    },
+    {
+      label: t("dashboard.avgPerDay"),
+      income: formatCurrency(income / dayCount, currency),
+      expense: formatCurrency(expenseAmount(expense / dayCount), currency),
+    },
+    {
+      label: t("dashboard.avgPerTx"),
+      income: formatCurrency(incomeCount ? income / incomeCount : 0, currency),
+      expense: formatCurrency(expenseCount ? expenseAmount(expense / expenseCount) : 0, currency),
+    },
+    {
+      label: t("dashboard.summary"),
+      income: formatCurrency(income, currency),
+      expense: formatCurrency(expenseAmount(expense), currency),
+    },
+  ];
+
+  return (
+    <section className="card widget-card widget-brief">
+      <h3>{label}</h3>
+      <table className="flow-brief">
+        <thead>
+          <tr>
+            <th />
+            <th>{t("reports.income")}</th>
+            <th>{t("reports.expense")}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.label}>
+              <th scope="row">{row.label}</th>
+              <td>{row.income}</td>
+              <td className="amount-expense">{row.expense}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
   );
 }
 

@@ -35,6 +35,7 @@ export default function AccountsPage({ embedded = false }: { embedded?: boolean 
             key={account.id}
             account={account}
             compact={false}
+            showBadges
             onClick={() => navigate(`/accounts/${account.id}`)}
           />
         ))}

@@ -166,7 +166,16 @@
     "periodExpenses": "Расходы",
     "balanceDynamics": "Динамика баланса",
     "cashFlow": "Денежный поток",
-    "expensesStructure": "Структура расходов"
+    "expensesStructure": "Структура расходов",
+    "flowCount": "Количество",
+    "avgPerDay": "Среднее (в день)",
+    "avgPerTx": "Среднее (за операцию)",
+    "summary": "Итого"
+  },
+  "sync": {
+    "initial": "Синхронизация данных…",
+    "failed": "Не удалось синхронизировать данные.",
+    "retry": "Повторить"
   },
   "accounts": {
     "title": "Счета",
