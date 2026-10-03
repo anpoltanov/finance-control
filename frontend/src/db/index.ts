@@ -81,6 +81,19 @@ export async function getLastSyncedAt(): Promise<string | undefined> {
   return row?.value;
 }
 
+/** True when IndexedDB already holds records the user can work with. */
+export async function hasLocalData(): Promise<boolean> {
+  const counts = await Promise.all([
+    db.accounts.count(),
+    db.categories.count(),
+    db.tags.count(),
+    db.transactions.count(),
+    db.budgets.count(),
+    db.planned.count(),
+  ]);
+  return counts.some((count) => count > 0);
+}
+
 export type OutboxFlushResult =
   | void
   | { drop: true }

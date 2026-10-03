@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, apiFetch, type PlannedTransaction, type Transaction } from "../api/client";
-import { applySyncPayload, clearLocalCache, flushOutbox, getLastSyncedAt } from "../db/index";
+import { applySyncPayload, clearLocalCache, flushOutbox, getLastSyncedAt, hasLocalData } from "../db/index";
 
 const SYNC_INTERVAL_MS = 60_000;
 const PERMANENT_FAILURE = new Set([400, 404, 409, 422]);
@@ -52,26 +52,29 @@ export function useOfflineSync(): { status: InitialSyncStatus; retry: () => void
     let running = false;
     let needsInitial = false;
 
+    async function openIfUsable(): Promise<boolean> {
+      if (cancelled) return true;
+      const since = await getLastSyncedAt();
+      if (!since && !(await hasLocalData())) return false;
+      needsInitial = false;
+      if (!cancelled) setStatus("ready");
+      return true;
+    }
+
     async function pullInitial() {
       if (running) return;
       running = true;
       if (!cancelled) setStatus("syncing");
       try {
         if (!navigator.onLine) {
-          if (!cancelled) setStatus("error");
+          if (!(await openIfUsable()) && !cancelled) setStatus("error");
           return;
         }
         await runSync();
-        const since = await getLastSyncedAt();
         if (cancelled) return;
-        if (since) {
-          needsInitial = false;
-          setStatus("ready");
-        } else {
-          setStatus("error");
-        }
+        if (!(await openIfUsable()) && !cancelled) setStatus("error");
       } catch {
-        if (!cancelled) setStatus("error");
+        if (!(await openIfUsable()) && !cancelled) setStatus("error");
       } finally {
         running = false;
       }
@@ -80,7 +83,10 @@ export function useOfflineSync(): { status: InitialSyncStatus; retry: () => void
     async function start() {
       const since = await getLastSyncedAt();
       if (cancelled) return;
-      if (!since) {
+      // Import drops last_synced_at without clearing IndexedDB. Only an empty
+      // database should block the app; existing records stay usable offline.
+      if (!since && !(await hasLocalData())) {
+        if (cancelled) return;
         needsInitial = true;
         await pullInitial();
         return;
