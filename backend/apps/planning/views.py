@@ -1,9 +1,12 @@
+from uuid import UUID
+
 from django.db import transaction
 from django.shortcuts import get_object_or_404
-from rest_framework import viewsets
+from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from apps.ledger.idempotency import DeletedClientId, find_by_client_id, lock_user
 from apps.ledger.serializers import TransactionSerializer
 from apps.planning.models import PlannedTransaction
 from apps.planning.serializers import PlannedCommitSerializer, PlannedTransactionSerializer
@@ -22,23 +25,45 @@ class PlannedTransactionViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         instance.soft_delete()
 
+    def _commit_response(self, request, tx, planned_id):
+        still_exists = PlannedTransaction.objects.filter(
+            pk=planned_id, user=request.user, deleted_at__isnull=True
+        ).first()
+        response = {"transaction": TransactionSerializer(tx, context={"request": request}).data, "planned": None}
+        if still_exists:
+            response["planned"] = PlannedTransactionSerializer(still_exists, context={"request": request}).data
+        return Response(response)
+
     @action(detail=True, methods=["post"])
     def commit(self, request, pk=None):
-        with transaction.atomic():
-            planned = get_object_or_404(
-                PlannedTransaction.objects.select_for_update(),
-                pk=pk,
-                user=request.user,
-                deleted_at__isnull=True,
-            )
-            planned_id = planned.pk
-            override_serializer = PlannedCommitSerializer(
-                data=request.data, context={"request": request, "planned": planned}
-            )
-            override_serializer.is_valid(raise_exception=True)
-            tx = planned.commit(override_serializer.validated_data)
-            still_exists = PlannedTransaction.objects.filter(pk=planned_id, deleted_at__isnull=True).first()
-            response = {"transaction": TransactionSerializer(tx, context={"request": request}).data, "planned": None}
-            if still_exists:
-                response["planned"] = PlannedTransactionSerializer(still_exists, context={"request": request}).data
-            return Response(response)
+        raw_client_id = request.data.get("client_id") if isinstance(request.data, dict) else None
+        client_id = None
+        if raw_client_id not in (None, ""):
+            try:
+                client_id = UUID(str(raw_client_id))
+            except (ValueError, TypeError, AttributeError):
+                return Response({"client_id": ["Must be a valid UUID."]}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            with transaction.atomic():
+                lock_user(request.user)
+                if client_id:
+                    existing = find_by_client_id(request.user, client_id)
+                    if existing is not None:
+                        return self._commit_response(request, existing, pk)
+                planned = get_object_or_404(
+                    PlannedTransaction.objects.select_for_update(),
+                    pk=pk,
+                    user=request.user,
+                    deleted_at__isnull=True,
+                )
+                planned_id = planned.pk
+                override_serializer = PlannedCommitSerializer(
+                    data=request.data, context={"request": request, "planned": planned}
+                )
+                override_serializer.is_valid(raise_exception=True)
+                tx = planned.commit(override_serializer.validated_data)
+                if tx.deleted_at is not None:
+                    raise DeletedClientId()
+                return self._commit_response(request, tx, planned_id)
+        except DeletedClientId as exc:
+            return Response({"detail": exc.detail}, status=status.HTTP_409_CONFLICT)

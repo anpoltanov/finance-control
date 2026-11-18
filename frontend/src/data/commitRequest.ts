@@ -12,6 +12,7 @@ export interface PlannedCommitOverrides {
   payment_type?: string;
   currency_code?: string;
   tag_ids?: number[];
+  client_id?: string;
 }
 
 export interface OfflineCommitRequest {

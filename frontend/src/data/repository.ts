@@ -3,6 +3,7 @@ import { db, nextTempId, queueOutbox } from "../db";
 import { offlineCommitOutbox, type PlannedCommitOverrides } from "./commitRequest";
 import { enrichTransaction } from "./queries";
 import { computeBudgetStatus } from "./reports";
+import { newClientId } from "../utils/clientId";
 import { localInputToIso, localTodayYmd } from "../utils/instants";
 
 async function rememberTags(record: { tag_ids?: number[]; tag_names?: string[] } | null | undefined) {
@@ -163,7 +164,8 @@ export async function deleteTag(id: number): Promise<void> {
 // ---- Transactions ----
 
 export async function createTransaction(data: Partial<Transaction>): Promise<Transaction> {
-  const online = await tryOnline(() => api.transactions.create(data));
+  const payload: Partial<Transaction> = data.client_id ? data : { ...data, client_id: newClientId() };
+  const online = await tryOnline(() => api.transactions.create(payload));
   if (online.ok) {
     await rememberTags(online.value);
     const enriched = await enrichTransaction(online.value);
@@ -173,23 +175,24 @@ export async function createTransaction(data: Partial<Transaction>): Promise<Tra
   const id = await nextTempId();
   const local = await enrichTransaction({
     id,
-    type: data.type || "expense",
-    account: Number(data.account),
-    to_account: data.to_account ?? null,
-    transfer_kind: data.transfer_kind ?? null,
-    amount: String(data.amount || "0"),
-    category: data.category ?? null,
-    date: data.date || new Date().toISOString(),
-    notes: data.notes || "",
-    recipient: data.recipient || "",
-    status: data.status || "cleared",
-    payment_type: data.payment_type || "",
-    currency_code: data.currency_code || "RUB",
-    tag_ids: data.tag_ids || [],
-    tag_names: data.tag_names || [],
+    type: payload.type || "expense",
+    account: Number(payload.account),
+    to_account: payload.to_account ?? null,
+    transfer_kind: payload.transfer_kind ?? null,
+    amount: String(payload.amount || "0"),
+    category: payload.category ?? null,
+    date: payload.date || new Date().toISOString(),
+    notes: payload.notes || "",
+    recipient: payload.recipient || "",
+    status: payload.status || "cleared",
+    payment_type: payload.payment_type || "",
+    currency_code: payload.currency_code || "RUB",
+    tag_ids: payload.tag_ids || [],
+    tag_names: payload.tag_names || [],
+    client_id: payload.client_id,
   });
   await db.transactions.put(local);
-  await queueOutbox({ method: "POST", path: "/transactions/", body: data, localId: id, entity: "transactions" });
+  await queueOutbox({ method: "POST", path: "/transactions/", body: payload, localId: id, entity: "transactions" });
   return local;
 }
 
@@ -344,7 +347,7 @@ function advancePlannedDate(date: string, rule: PlannedTransaction["repeat_rule"
 }
 
 export async function commitPlanned(id: number, overrides?: PlannedCommitOverrides): Promise<void> {
-  const request = offlineCommitOutbox(id, overrides);
+  const request = offlineCommitOutbox(id, { ...overrides, client_id: overrides?.client_id || newClientId() });
   const online = await tryOnline(() => api.planned.commit(id, request.body));
   if (online.ok) {
     const result = online.value;

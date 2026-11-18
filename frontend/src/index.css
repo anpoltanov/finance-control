@@ -1867,6 +1867,66 @@ td {
   margin: 1rem 0 0.5rem;
 }
 
+.duplicate-review {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border, #e2e8f0);
+}
+
+.duplicate-actions,
+.duplicate-group-header,
+.duplicate-copies {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.duplicate-actions {
+  margin: 0.75rem 0 1rem;
+}
+
+.duplicate-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.duplicate-group {
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 12px;
+  padding: 0.9rem 1rem;
+}
+
+.duplicate-group h4 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.duplicate-group-header {
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.duplicate-include,
+.duplicate-copy {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.duplicate-copies {
+  flex-direction: column;
+  gap: 0.4rem;
+  border: 0;
+  margin: 0 0 0.75rem;
+  padding: 0;
+}
+
+.duplicate-copy.is-kept {
+  font-weight: 600;
+}
+
 .page-header .tx-count {
   margin-top: 0.2rem;
 }

@@ -1,7 +1,10 @@
 from django.db.models import Q
 from rest_framework import viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
 
 from apps.core.dates import parse_datetime_param
+from apps.ledger.duplicates import find_duplicate_groups, resolve_duplicates
 from apps.ledger.models import Account, Category, Tag, Transaction
 from apps.ledger.serializers import (
     AccountSerializer,
@@ -64,3 +67,10 @@ class TransactionViewSet(UserScopedMixin, viewsets.ModelViewSet):
         if params.get("tag"):
             qs = qs.filter(tags__id=params["tag"])
         return qs.distinct()
+
+    @action(detail=False, methods=["get", "post"], url_path="duplicate-groups")
+    def duplicate_groups(self, request):
+        if request.method == "POST":
+            deleted = resolve_duplicates(request.user, request.data.get("resolutions"))
+            return Response({"deleted": deleted})
+        return Response({"groups": find_duplicate_groups(request.user)})

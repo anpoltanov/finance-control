@@ -210,6 +210,8 @@ class Transaction(TimestampedModel):
     )
     import_source_id = models.CharField(max_length=64, blank=True, db_index=True)
     import_pair_id = models.UUIDField(null=True, blank=True)
+    # Stable id for one save. Retries and a second open device must reuse it.
+    client_id = models.UUIDField(null=True, blank=True)
 
     class Meta:
         ordering = ["-date", "-id"]
@@ -219,6 +221,13 @@ class Transaction(TimestampedModel):
             models.Index(fields=["user", "account"]),
             models.Index(fields=["user", "category"]),
             models.Index(fields=["user", "status"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "client_id"],
+                condition=models.Q(client_id__isnull=False),
+                name="ledger_tx_user_client_id_uniq",
+            ),
         ]
 
     def __str__(self):

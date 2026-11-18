@@ -1,5 +1,6 @@
 import Dexie, { type EntityTable } from "dexie";
 import type { Account, Budget, Category, PlannedTransaction, SyncPayload, Tag, Transaction } from "../api/client";
+import { newClientId } from "../utils/clientId";
 
 export interface OutboxItem {
   id?: number;
@@ -96,15 +97,71 @@ export async function hasLocalData(): Promise<boolean> {
 
 export type OutboxFlushResult =
   | void
-  | { drop: true }
+  | { drop: true; status?: number }
   | { id: number }
   | { transaction: Transaction; planned: PlannedTransaction | null };
 
-export async function flushOutbox(fetchFn: (item: OutboxItem) => Promise<OutboxFlushResult>) {
-  const items = await db.outbox.orderBy("createdAt").toArray();
+const TRANSACTION_CREATE = /^\/transactions\/?$/;
+const PLANNED_COMMIT = /^\/planned-transactions\/\d+\/commit\/?$/;
+
+function outboxBody(item: OutboxItem): Record<string, unknown> {
+  if (item.body && typeof item.body === "object" && !Array.isArray(item.body)) {
+    return { ...(item.body as Record<string, unknown>) };
+  }
+  return {};
+}
+
+/** Give each queued create a client_id before it is sent, and keep that id if the send is retried. */
+export async function stampOutboxClientIds(items: OutboxItem[]): Promise<OutboxItem[]> {
+  const stamped: OutboxItem[] = [];
+  await db.transaction("rw", db.outbox, async () => {
+    for (const item of items) {
+      if (item.method !== "POST" || (!TRANSACTION_CREATE.test(item.path) && !PLANNED_COMMIT.test(item.path))) {
+        stamped.push(item);
+        continue;
+      }
+      const fresh = item.id ? await db.outbox.get(item.id) : item;
+      if (!fresh) continue;
+      const body = outboxBody(fresh);
+      if (typeof body.client_id !== "string" || body.client_id.length === 0) {
+        body.client_id = newClientId();
+        if (fresh.id) await db.outbox.update(fresh.id, { body });
+      }
+      stamped.push({ ...fresh, body });
+    }
+  });
+  return stamped;
+}
+
+let outboxChain: Promise<void> = Promise.resolve();
+
+function withOutboxLock(fn: () => Promise<void>): Promise<void> {
+  const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
+  if (locks && typeof locks.request === "function") {
+    // The lock is held until fn settles. The DOM types don't flatten that promise.
+    return locks.request("finance-control-outbox", () => fn()) as unknown as Promise<void>;
+  }
+  const run = outboxChain.then(fn, fn);
+  outboxChain = run.then(
+    () => undefined,
+    () => undefined
+  );
+  return run;
+}
+
+export function flushOutbox(fetchFn: (item: OutboxItem) => Promise<OutboxFlushResult>): Promise<void> {
+  return withOutboxLock(() => flushOutboxUnlocked(fetchFn));
+}
+
+async function flushOutboxUnlocked(fetchFn: (item: OutboxItem) => Promise<OutboxFlushResult>) {
+  const items = await stampOutboxClientIds(await db.outbox.orderBy("createdAt").toArray());
   for (const item of items) {
     const result = await fetchFn(item);
     if (result && typeof result === "object" && "drop" in result && result.drop) {
+      const status = "status" in result ? result.status : undefined;
+      if ((status === 404 || status === 409) && item.method === "POST" && item.localId && item.entity) {
+        await entityTable(item.entity).delete(item.localId);
+      }
       if (item.id) await db.outbox.delete(item.id);
       continue;
     }

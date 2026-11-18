@@ -103,6 +103,12 @@ export const api = {
     update: (id: number, data: Partial<Transaction>) =>
       request<Transaction>(`/transactions/${id}/`, { method: "PATCH", body: JSON.stringify(data) }),
     delete: (id: number) => request(`/transactions/${id}/`, { method: "DELETE" }),
+    duplicateGroups: () => request<DuplicateGroupsResponse>("/transactions/duplicate-groups/"),
+    resolveDuplicates: (resolutions: DuplicateResolution[]) =>
+      request<{ deleted: number }>("/transactions/duplicate-groups/", {
+        method: "POST",
+        body: JSON.stringify({ resolutions }),
+      }),
   },
   budgets: {
     list: () => request<Budget[]>("/budgets/"),
@@ -195,6 +201,39 @@ export interface Transaction {
   currency_code: string;
   tag_ids?: number[];
   tag_names?: string[];
+  client_id?: string | null;
+}
+
+export interface DuplicateCopy {
+  id: number;
+  created_at: string;
+  version: number;
+}
+
+export interface DuplicateGroup {
+  key: string;
+  count: number;
+  suggested_keep_id: number;
+  transaction: {
+    type: Transaction["type"];
+    amount: string;
+    date: string;
+    notes: string;
+    recipient: string;
+    account_title: string;
+    category_name: string;
+    currency_code: string;
+  };
+  copies: DuplicateCopy[];
+}
+
+export interface DuplicateGroupsResponse {
+  groups: DuplicateGroup[];
+}
+
+export interface DuplicateResolution {
+  keep_id: number;
+  delete_ids: number[];
 }
 
 export interface BudgetStatus {
