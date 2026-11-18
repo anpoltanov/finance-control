@@ -1,15 +1,31 @@
 const BASE = "/api/v1";
+const REFRESH_LOCK = "auth-refresh";
 
 let refreshInFlight: Promise<boolean> | null = null;
 
+async function postRefresh(): Promise<boolean> {
+  try {
+    const res = await fetch(`${BASE}/auth/refresh/`, { method: "POST", credentials: "include" });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** Serialize refresh across tabs; rotation blacklists the previous cookie. */
+async function refreshAcrossTabs(): Promise<boolean> {
+  const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
+  if (locks?.request) {
+    return locks.request(REFRESH_LOCK, postRefresh);
+  }
+  return postRefresh();
+}
+
 async function tryRefreshSession(): Promise<boolean> {
   if (refreshInFlight) return refreshInFlight;
-  refreshInFlight = fetch(`${BASE}/auth/refresh/`, { method: "POST", credentials: "include" })
-    .then((res) => res.ok)
-    .catch(() => false)
-    .finally(() => {
-      refreshInFlight = null;
-    });
+  refreshInFlight = refreshAcrossTabs().finally(() => {
+    refreshInFlight = null;
+  });
   return refreshInFlight;
 }
 
