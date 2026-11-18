@@ -7,7 +7,7 @@ const PERMANENT_FAILURE = new Set([400, 404, 409, 422]);
 
 export type InitialSyncStatus = "checking" | "syncing" | "error" | "ready";
 
-export async function runSync(): Promise<void> {
+async function runSyncBody(): Promise<void> {
   if (!navigator.onLine) return;
   try {
     await flushOutbox(async (item) => {
@@ -16,7 +16,7 @@ export async function runSync(): Promise<void> {
         body: item.body ? JSON.stringify(item.body) : undefined,
       });
       if (PERMANENT_FAILURE.has(res.status)) {
-        return { drop: true };
+        return { drop: true, status: res.status };
       }
       if (!res.ok) throw new Error(`Outbox flush failed: ${res.status}`);
       if (res.status === 204) return;
@@ -35,6 +35,18 @@ export async function runSync(): Promise<void> {
   const since = await getLastSyncedAt();
   const payload = await api.sync(since);
   await applySyncPayload(payload);
+}
+
+let syncChain: Promise<void> = Promise.resolve();
+
+/** Run one sync at a time. Overlapping calls from two open screens wait, then flush anything new. */
+export function runSync(): Promise<void> {
+  const run = syncChain.then(() => runSyncBody());
+  syncChain = run.then(
+    () => undefined,
+    () => undefined
+  );
+  return run;
 }
 
 export async function resetLocalCache(): Promise<void> {

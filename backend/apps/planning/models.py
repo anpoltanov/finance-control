@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from dateutil.relativedelta import relativedelta
 from django.contrib.auth.models import User
-from django.db import models
+from django.db import IntegrityError, models, transaction as db_transaction
 from django.utils import timezone
 
 from apps.ledger.models import Account, Category, Tag, TimestampedModel, Transaction
@@ -52,7 +52,12 @@ class PlannedTransaction(TimestampedModel):
             self.next_occurrence_date += relativedelta(years=1)
 
     def commit(self, overrides=None) -> Transaction:
-        overrides = overrides or {}
+        overrides = dict(overrides or {})
+        client_id = overrides.pop("client_id", None)
+        if client_id:
+            existing = Transaction.objects.filter(user=self.user, client_id=client_id).first()
+            if existing is not None:
+                return existing
         when = overrides.get("date")
         if when is None:
             naive = datetime.combine(self.next_occurrence_date, dt_time.min)
@@ -60,22 +65,30 @@ class PlannedTransaction(TimestampedModel):
         elif timezone.is_naive(when):
             when = timezone.make_aware(when)
 
-        tx = Transaction.objects.create(
-            user=self.user,
-            type=overrides.get("type", self.type),
-            account=overrides.get("account", self.account),
-            to_account=overrides["to_account"] if "to_account" in overrides else self.to_account,
-            transfer_kind=overrides["transfer_kind"] if "transfer_kind" in overrides else self.transfer_kind,
-            amount=overrides.get("amount", self.amount),
-            category=overrides["category"] if "category" in overrides else self.category,
-            date=when,
-            notes=overrides.get("notes", self.notes),
-            recipient=overrides.get("recipient", self.recipient),
-            payment_type=overrides.get("payment_type", self.payment_type),
-            currency_code=overrides.get("currency_code", self.currency_code),
-            planned_transaction=self,
-            status=overrides.get("status", Transaction.STATUS_CLEARED),
-        )
+        try:
+            with db_transaction.atomic():
+                tx = Transaction.objects.create(
+                    user=self.user,
+                    type=overrides.get("type", self.type),
+                    account=overrides.get("account", self.account),
+                    to_account=overrides["to_account"] if "to_account" in overrides else self.to_account,
+                    transfer_kind=overrides["transfer_kind"] if "transfer_kind" in overrides else self.transfer_kind,
+                    amount=overrides.get("amount", self.amount),
+                    category=overrides["category"] if "category" in overrides else self.category,
+                    date=when,
+                    notes=overrides.get("notes", self.notes),
+                    recipient=overrides.get("recipient", self.recipient),
+                    payment_type=overrides.get("payment_type", self.payment_type),
+                    currency_code=overrides.get("currency_code", self.currency_code),
+                    planned_transaction=self,
+                    status=overrides.get("status", Transaction.STATUS_CLEARED),
+                    client_id=client_id,
+                )
+        except IntegrityError:
+            existing = Transaction.objects.filter(user=self.user, client_id=client_id).first() if client_id else None
+            if existing is None:
+                raise
+            return existing
         if "tags" in overrides:
             tx.tags.set(overrides["tags"])
         else:

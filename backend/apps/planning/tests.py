@@ -1,7 +1,9 @@
+from uuid import uuid4
+
 from django.contrib.auth.models import User
 from rest_framework.test import APITestCase
 
-from apps.ledger.models import Account, Category, Tag
+from apps.ledger.models import Account, Category, Tag, Transaction
 
 
 class PlannedTransactionApiTests(APITestCase):
@@ -141,3 +143,22 @@ class PlannedTransactionApiTests(APITestCase):
         self.assertEqual(saved["notes"], "Ипотека")
         self.assertEqual(saved["category"], self.category.id)
         self.assertEqual(saved["next_occurrence_date"], "2026-11-25")
+
+    def test_commit_replay_with_the_same_client_id_does_not_advance_twice(self):
+        planned = self._expense_plan()
+        client_id = str(uuid4())
+        first = self.client.post(
+            f"/api/v1/planned-transactions/{planned['id']}/commit/",
+            {"client_id": client_id},
+            format="json",
+        )
+        second = self.client.post(
+            f"/api/v1/planned-transactions/{planned['id']}/commit/",
+            {"client_id": client_id},
+            format="json",
+        )
+        self.assertEqual(first.status_code, 200, first.content)
+        self.assertEqual(second.status_code, 200, second.content)
+        self.assertEqual(first.data["transaction"]["id"], second.data["transaction"]["id"])
+        self.assertEqual(Transaction.objects.filter(user=self.user).count(), 1)
+        self.assertEqual(second.data["planned"]["next_occurrence_date"], "2026-11-25")

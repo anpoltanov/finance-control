@@ -24,6 +24,7 @@ class PlannedCommitSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=Transaction.STATUS_CHOICES, required=False)
     payment_type = serializers.CharField(required=False, allow_blank=True)
     currency_code = serializers.CharField(required=False, max_length=3)
+    client_id = serializers.UUIDField(required=False, allow_null=True)
     tag_ids = serializers.PrimaryKeyRelatedField(
         source="tags", queryset=Tag.objects.none(), many=True, required=False
     )

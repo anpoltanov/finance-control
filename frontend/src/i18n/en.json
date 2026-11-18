@@ -93,7 +93,28 @@
       "resetConfirm": "Clear all local data on this device? Unsynced changes will be discarded. Data on the server is kept.",
       "resetting": "Resetting…",
       "resetDone": "Local data reloaded from the server",
-      "resetFailed": "Could not reload local data"
+      "resetFailed": "Could not reload local data",
+      "duplicates": {
+        "title": "Duplicate transactions",
+        "hint": "Copies that match exactly — same account, amount, category, time, notes, and tags — are listed together. Choose which copy to keep. The others are removed, then this device syncs so the other open screen drops them too.",
+        "searching": "Looking for copies…",
+        "none": "No exact copies.",
+        "failed": "Could not update duplicates.",
+        "summary": "{{groups}} groups selected for cleanup, {{extras}} extra copies",
+        "include": "Include in bulk cleanup",
+        "copies": "{{count}} copies",
+        "saved": "Saved {{time}}",
+        "keep": "Keep",
+        "remove": "Remove",
+        "version": "version {{version}}",
+        "removeGroup": "Remove the other copies",
+        "removeAll": "Remove extras in selected groups",
+        "refresh": "Look again",
+        "confirmGroup": "Remove {{count}} extra copies of this transaction? The one marked Keep stays.",
+        "confirmAll": "Remove {{count}} extra copies? In each selected group, the copy marked Keep stays.",
+        "removed": "Removed {{count}} extra copies.",
+        "removedSyncLater": "Removed {{count}} extra copies on the server. This device will catch up on the next sync."
+      }
     }
   },
   "txType": {

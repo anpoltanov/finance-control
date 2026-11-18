@@ -1,5 +1,6 @@
-from datetime import datetime, timezone as datetime_timezone
+from datetime import datetime, timedelta, timezone as datetime_timezone
 from decimal import Decimal
+from uuid import uuid4
 
 from django.contrib.auth.models import User
 from django.utils import timezone
@@ -346,3 +347,181 @@ class TransactionInstantTests(APITestCase):
             returned = datetime.fromisoformat(res.data["date"].replace("Z", "+00:00"))
             self.assertEqual(returned, expected)
             self.assertTrue(res.data["date"].endswith("+03:00"), res.data["date"])
+
+
+class TransactionIdempotencyTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="idem", password="p")
+        self.other = User.objects.create_user(username="other", password="p")
+        self.client.force_authenticate(self.user)
+        self.account = Account.objects.create(user=self.user, title="Cash")
+        self.category = Category.objects.create(user=self.user, name="Food", type=Category.TYPE_EXPENSE)
+        self.tag = Tag.objects.create(user=self.user, name="lunch")
+
+    def _payload(self, **extra):
+        payload = {
+            "type": "expense",
+            "account": self.account.id,
+            "amount": "5200.00",
+            "category": self.category.id,
+            "date": "2026-08-24T12:26:00+03:00",
+            "notes": "",
+            "recipient": "",
+            "status": "cleared",
+            "currency_code": "RUB",
+            "tag_ids": [self.tag.id],
+        }
+        payload.update(extra)
+        return payload
+
+    def test_same_client_id_is_one_transaction(self):
+        client_id = str(uuid4())
+        first = self.client.post("/api/v1/transactions/", self._payload(client_id=client_id), format="json")
+        second = self.client.post("/api/v1/transactions/", self._payload(client_id=client_id), format="json")
+        self.assertEqual(first.status_code, 201, first.content)
+        self.assertEqual(second.status_code, 201, second.content)
+        self.assertEqual(first.data["id"], second.data["id"])
+        self.assertEqual(Transaction.objects.filter(user=self.user).count(), 1)
+        self.assertEqual(list(second.data["tag_ids"]), [self.tag.id])
+
+    def test_different_client_ids_keep_intentional_duplicates(self):
+        first = self.client.post("/api/v1/transactions/", self._payload(client_id=str(uuid4())), format="json")
+        second = self.client.post("/api/v1/transactions/", self._payload(client_id=str(uuid4())), format="json")
+        self.assertEqual(first.status_code, 201, first.content)
+        self.assertEqual(second.status_code, 201, second.content)
+        self.assertNotEqual(first.data["id"], second.data["id"])
+        self.assertEqual(Transaction.objects.filter(user=self.user, deleted_at__isnull=True).count(), 2)
+
+    def test_replay_after_delete_does_not_recreate(self):
+        client_id = str(uuid4())
+        created = self.client.post("/api/v1/transactions/", self._payload(client_id=client_id), format="json")
+        self.assertEqual(created.status_code, 201, created.content)
+        Transaction.objects.get(pk=created.data["id"]).soft_delete()
+        replay = self.client.post("/api/v1/transactions/", self._payload(client_id=client_id), format="json")
+        self.assertEqual(replay.status_code, 409, replay.content)
+        self.assertEqual(Transaction.objects.filter(user=self.user, deleted_at__isnull=True).count(), 0)
+        self.assertEqual(Transaction.objects.filter(user=self.user).count(), 1)
+
+    def test_legacy_replay_without_client_id_collapses_a_burst(self):
+        first = self.client.post("/api/v1/transactions/", self._payload(), format="json")
+        second = self.client.post("/api/v1/transactions/", self._payload(), format="json")
+        self.assertEqual(first.status_code, 201, first.content)
+        self.assertEqual(second.status_code, 201, second.content)
+        self.assertEqual(first.data["id"], second.data["id"])
+        self.assertEqual(Transaction.objects.filter(user=self.user).count(), 1)
+
+    def test_legacy_create_after_the_burst_window_is_a_new_transaction(self):
+        first = self.client.post("/api/v1/transactions/", self._payload(), format="json")
+        self.assertEqual(first.status_code, 201, first.content)
+        Transaction.objects.filter(pk=first.data["id"]).update(created_at=timezone.now() - timedelta(seconds=30))
+        second = self.client.post("/api/v1/transactions/", self._payload(), format="json")
+        self.assertEqual(second.status_code, 201, second.content)
+        self.assertNotEqual(first.data["id"], second.data["id"])
+
+    def test_same_client_id_is_independent_per_user(self):
+        client_id = str(uuid4())
+        own = self.client.post("/api/v1/transactions/", self._payload(client_id=client_id), format="json")
+        self.assertEqual(own.status_code, 201, own.content)
+        other_account = Account.objects.create(user=self.other, title="Other")
+        self.client.force_authenticate(self.other)
+        other = self.client.post(
+            "/api/v1/transactions/",
+            {
+                "type": "expense",
+                "account": other_account.id,
+                "amount": "5.00",
+                "date": "2026-08-24T12:26:00+03:00",
+                "currency_code": "RUB",
+                "client_id": client_id,
+            },
+            format="json",
+        )
+        self.assertEqual(other.status_code, 201, other.content)
+        self.assertNotEqual(own.data["id"], other.data["id"])
+
+
+class DuplicateReviewTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="review", password="p")
+        self.other = User.objects.create_user(username="review-other", password="p")
+        self.client.force_authenticate(self.user)
+        self.account = Account.objects.create(user=self.user, title="Card")
+        self.category = Category.objects.create(user=self.user, name="Cafe", type=Category.TYPE_EXPENSE)
+        self.when = timezone.now()
+
+    def _tx(self, **extra):
+        fields = {
+            "user": self.user,
+            "type": Transaction.TYPE_EXPENSE,
+            "account": self.account,
+            "category": self.category,
+            "amount": Decimal("679.00"),
+            "date": self.when,
+            "notes": "",
+            "recipient": "",
+            "status": Transaction.STATUS_CLEARED,
+            "currency_code": "RUB",
+        }
+        fields.update(extra)
+        return Transaction.objects.create(**fields)
+
+    def test_groups_exact_copies_and_resolve_keeps_the_chosen_one(self):
+        first = self._tx()
+        second = self._tx()
+        third = self._tx()
+        self._tx(amount=Decimal("10.00"))
+        listed = self.client.get("/api/v1/transactions/duplicate-groups/")
+        self.assertEqual(listed.status_code, 200, listed.content)
+        self.assertEqual(len(listed.data["groups"]), 1)
+        group = listed.data["groups"][0]
+        self.assertEqual(group["count"], 3)
+        self.assertEqual(group["suggested_keep_id"], first.id)
+        self.assertEqual(sorted(copy["id"] for copy in group["copies"]), [first.id, second.id, third.id])
+
+        resolved = self.client.post(
+            "/api/v1/transactions/duplicate-groups/",
+            {"resolutions": [{"keep_id": second.id, "delete_ids": [first.id, third.id]}]},
+            format="json",
+        )
+        self.assertEqual(resolved.status_code, 200, resolved.content)
+        self.assertEqual(resolved.data["deleted"], 2)
+        self.assertIsNone(Transaction.objects.get(pk=second.id).deleted_at)
+        self.assertIsNotNone(Transaction.objects.get(pk=first.id).deleted_at)
+        self.assertIsNotNone(Transaction.objects.get(pk=third.id).deleted_at)
+        self.assertEqual(Transaction.objects.filter(user=self.user, deleted_at__isnull=True).count(), 2)
+        again = self.client.get("/api/v1/transactions/duplicate-groups/")
+        self.assertEqual(again.data["groups"], [])
+
+    def test_resolve_refuses_a_transaction_that_is_not_a_copy(self):
+        keep = self._tx()
+        copy = self._tx()
+        other = self._tx(notes="not the same")
+        res = self.client.post(
+            "/api/v1/transactions/duplicate-groups/",
+            {"resolutions": [{"keep_id": keep.id, "delete_ids": [copy.id, other.id]}]},
+            format="json",
+        )
+        self.assertEqual(res.status_code, 400, res.content)
+        self.assertIsNone(Transaction.objects.get(pk=copy.id).deleted_at)
+        self.assertIsNone(Transaction.objects.get(pk=other.id).deleted_at)
+
+    def test_resolve_cannot_delete_another_users_transaction(self):
+        keep = self._tx()
+        copy = self._tx()
+        foreign_account = Account.objects.create(user=self.other, title="Foreign")
+        foreign = Transaction.objects.create(
+            user=self.other,
+            type=Transaction.TYPE_EXPENSE,
+            account=foreign_account,
+            amount=Decimal("679.00"),
+            date=self.when,
+            currency_code="RUB",
+        )
+        res = self.client.post(
+            "/api/v1/transactions/duplicate-groups/",
+            {"resolutions": [{"keep_id": keep.id, "delete_ids": [copy.id, foreign.id]}]},
+            format="json",
+        )
+        self.assertEqual(res.status_code, 400, res.content)
+        self.assertIsNone(Transaction.objects.get(pk=foreign.id).deleted_at)
+        self.assertIsNone(Transaction.objects.get(pk=copy.id).deleted_at)

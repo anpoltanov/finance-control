@@ -1,6 +1,8 @@
+from django.db import IntegrityError, transaction as db_transaction
 from django.utils import timezone
 from rest_framework import serializers
 
+from apps.ledger.idempotency import find_by_client_id, find_recent_identical, lock_user
 from apps.ledger.models import Account, Category, Tag, Transaction
 from apps.planning.models import PlannedTransaction
 
@@ -135,6 +137,7 @@ class TransactionSerializer(serializers.ModelSerializer):
             "planned_transaction",
             "import_source_id",
             "import_pair_id",
+            "client_id",
             "created_at",
             "updated_at",
             "version",
@@ -202,12 +205,32 @@ class TransactionSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         tags = validated_data.pop("tags", [])
-        validated_data["user"] = self.context["request"].user
-        tx = super().create(validated_data)
-        assign_tags(tx, tags)
-        return tx
+        user = self.context["request"].user
+        client_id = validated_data.get("client_id")
+        validated_data["user"] = user
+        with db_transaction.atomic():
+            lock_user(user)
+            if client_id:
+                existing = find_by_client_id(user, client_id)
+                if existing is not None:
+                    return existing
+            else:
+                recent = find_recent_identical(user, validated_data, tags)
+                if recent is not None:
+                    return recent
+            try:
+                with db_transaction.atomic():
+                    tx = super().create(validated_data)
+            except IntegrityError:
+                existing = find_by_client_id(user, client_id) if client_id else None
+                if existing is None:
+                    raise
+                return existing
+            assign_tags(tx, tags)
+            return tx
 
     def update(self, instance, validated_data):
+        validated_data.pop("client_id", None)
         if "tags" in validated_data:
             tags = validated_data.pop("tags")
         else:

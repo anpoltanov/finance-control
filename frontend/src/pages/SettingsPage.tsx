@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAsyncAction } from "../hooks/useAsyncAction";
 import { resetLocalCache, runSync } from "../hooks/useOfflineSync";
+import DuplicateReview from "../components/DuplicateReview";
 import AccountsPage from "./AccountsPage";
 import CategoriesPage from "./CategoriesPage";
 import ImportPage from "./ImportPage";
@@ -105,6 +106,7 @@ export default function SettingsPage() {
           </div>
           {status && <p className="muted-text">{status}</p>}
           {error && <p className="form-error">{error}</p>}
+          <DuplicateReview />
         </div>
       )}
     </div>
