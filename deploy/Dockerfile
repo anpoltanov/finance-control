@@ -1,7 +1,9 @@
 FROM node:22-alpine AS frontend
 WORKDIR /frontend
-COPY frontend/package.json ./
-RUN npm install
+# Install from the lockfile. Rollup 4.68.6's parser rejects ordinary
+# modules on Alpine; the lockfile stays on 4.62.4.
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
 COPY frontend/ ./
 RUN mkdir -p ../backend/static/frontend
 RUN npm run build
