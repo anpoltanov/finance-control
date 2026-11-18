@@ -2,10 +2,12 @@ from django.contrib.auth.models import User
 from django.core.management import call_command
 from django.test import SimpleTestCase, override_settings
 from django.urls import NoReverseMatch, reverse
+from django.utils.dateparse import parse_datetime
 from rest_framework.test import APITestCase
 
 from apps.core.throttles import LoginRateThrottle
 from apps.core.views import LoginView
+from apps.ledger.models import Account, Transaction
 from config.settings import _parse_host_list
 
 
@@ -106,6 +108,52 @@ class SyncDateTests(APITestCase):
     def test_invalid_report_from_returns_400(self):
         res = self.client.get("/api/v1/reports/summary/", {"from": "yesterday"})
         self.assertEqual(res.status_code, 400)
+
+
+class SyncDeletionTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="syncer", password="p")
+        self.client.force_authenticate(self.user)
+        self.account = Account.objects.create(user=self.user, title="Cash")
+
+    def _create(self, amount):
+        res = self.client.post(
+            "/api/v1/transactions/",
+            {
+                "type": "expense",
+                "account": self.account.id,
+                "amount": amount,
+                "date": "2026-08-24T12:26:00+03:00",
+                "currency_code": "RUB",
+            },
+            format="json",
+        )
+        self.assertEqual(res.status_code, 201, res.content)
+        return res.data["id"]
+
+    def test_soft_delete_is_in_the_next_incremental_sync(self):
+        baseline = self.client.get("/api/v1/sync/")
+        self.assertEqual(baseline.status_code, 200, baseline.content)
+        tx_id = self._create("10.00")
+        created = self.client.get("/api/v1/sync/", {"since": baseline.data["synced_at"]})
+        self.assertIn(tx_id, [row["id"] for row in created.data["transactions"]])
+        Transaction.objects.get(pk=tx_id).soft_delete()
+        deleted = self.client.get("/api/v1/sync/", {"since": created.data["synced_at"]})
+        self.assertEqual(deleted.status_code, 200, deleted.content)
+        self.assertIn(tx_id, deleted.data["deleted_ids"]["transactions"])
+        self.assertNotIn(tx_id, [row["id"] for row in deleted.data["transactions"]])
+
+    def test_delete_at_the_cursor_instant_is_not_skipped(self):
+        tx_id = self._create("11.00")
+        baseline = self.client.get("/api/v1/sync/")
+        cursor = parse_datetime(baseline.data["synced_at"])
+        self.assertIsNotNone(cursor)
+        tx = Transaction.objects.get(pk=tx_id)
+        tx.deleted_at = cursor
+        tx.save(update_fields=["deleted_at"])
+        res = self.client.get("/api/v1/sync/", {"since": baseline.data["synced_at"]})
+        self.assertIn(tx_id, res.data["deleted_ids"]["transactions"])
+        self.assertNotIn(tx_id, [row["id"] for row in res.data["transactions"]])
 
 
 class McpAuthTests(APITestCase):

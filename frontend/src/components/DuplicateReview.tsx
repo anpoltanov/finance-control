@@ -5,6 +5,7 @@ import {
   type DuplicateGroup,
   type DuplicateResolution,
 } from "../api/client";
+import { db } from "../db";
 import { runSync } from "../hooks/useOfflineSync";
 import { formatCurrency, formatDateTime } from "../utils/format";
 
@@ -64,6 +65,7 @@ export default function DuplicateReview() {
     setNotice("");
     try {
       const result = await api.transactions.resolveDuplicates(resolutions);
+      await db.transactions.bulkDelete(resolutions.flatMap((item) => item.delete_ids));
       try {
         await runSync();
         setNotice(t("settings.data.duplicates.removed", { count: result.deleted }));
