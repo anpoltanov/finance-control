@@ -55,6 +55,14 @@ export async function applySyncPayload(payload: SyncPayload) {
     "rw",
     [db.accounts, db.categories, db.tags, db.transactions, db.budgets, db.planned, db.meta],
     async () => {
+      if (payload.accounts.length) await db.accounts.bulkPut(payload.accounts);
+      if (payload.categories.length) await db.categories.bulkPut(payload.categories);
+      if (payload.tags.length) await db.tags.bulkPut(payload.tags);
+      if (payload.transactions.length) await db.transactions.bulkPut(payload.transactions);
+      if (payload.budgets.length) await db.budgets.bulkPut(payload.budgets);
+      if (payload.planned_transactions.length) await db.planned.bulkPut(payload.planned_transactions);
+      // A sync that started before a delete can list the row and its id together.
+      // Removing after the write keeps the delete.
       if (deleted) {
         if (deleted.accounts.length) await db.accounts.bulkDelete(deleted.accounts);
         if (deleted.categories.length) await db.categories.bulkDelete(deleted.categories);
@@ -63,12 +71,6 @@ export async function applySyncPayload(payload: SyncPayload) {
         if (deleted.budgets.length) await db.budgets.bulkDelete(deleted.budgets);
         if (deleted.planned_transactions.length) await db.planned.bulkDelete(deleted.planned_transactions);
       }
-      if (payload.accounts.length) await db.accounts.bulkPut(payload.accounts);
-      if (payload.categories.length) await db.categories.bulkPut(payload.categories);
-      if (payload.tags.length) await db.tags.bulkPut(payload.tags);
-      if (payload.transactions.length) await db.transactions.bulkPut(payload.transactions);
-      if (payload.budgets.length) await db.budgets.bulkPut(payload.budgets);
-      if (payload.planned_transactions.length) await db.planned.bulkPut(payload.planned_transactions);
       await db.meta.put({ key: "last_synced_at", value: payload.synced_at });
     }
   );

@@ -1931,3 +1931,26 @@ td {
   margin-top: 0.2rem;
 }
 
+.transactions-page {
+  padding-bottom: 4.5rem;
+}
+
+.tx-create-fab {
+  position: fixed;
+  z-index: 40;
+  right: max(1.25rem, env(safe-area-inset-right, 0px));
+  bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));
+  width: 3.5rem;
+  height: 3.5rem;
+  padding: 0;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow);
+}
+
+.tx-create-fab .material-symbols-outlined {
+  font-size: 1.85rem;
+}
+

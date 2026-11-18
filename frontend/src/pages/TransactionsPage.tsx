@@ -6,6 +6,7 @@ import DateRangeNav from "../components/DateRangeNav";
 import TransactionFilters from "../components/TransactionFilters";
 import TransactionList from "../components/TransactionList";
 import TransactionTotals from "../components/TransactionTotals";
+import GlyphIcon from "../components/GlyphIcon";
 import { useAddTransaction } from "../context/AddTransactionContext";
 import { useFilterSidebar } from "../context/FilterSidebarContext";
 import { listAccounts, listCategories, listTags, listTransactions } from "../data/queries";
@@ -13,7 +14,7 @@ import { useDateRangePeriod } from "../hooks/useDateRangePeriod";
 
 export default function TransactionsPage() {
   const { t, i18n } = useTranslation();
-  const { openEditTransaction } = useAddTransaction();
+  const { openAddTransaction, openEditTransaction } = useAddTransaction();
   const range = useDateRangePeriod("month");
   const [filters, setFilters] = useState<Record<string, string>>({});
 
@@ -45,7 +46,7 @@ export default function TransactionsPage() {
   useFilterSidebar(filterSidebar, [filters, accounts, categories, tags, i18n.language]);
 
   return (
-    <div>
+    <div className="transactions-page">
       <div className="page-header">
         <div>
           <h2>{t("transactions.title")}</h2>
@@ -58,6 +59,9 @@ export default function TransactionsPage() {
         transactions={transactions}
         onEdit={(tx: Transaction) => openEditTransaction(tx)}
       />
+      <button type="button" className="tx-create-fab" onClick={() => openAddTransaction()} aria-label={t("nav.add")}>
+        <GlyphIcon icon="add" />
+      </button>
     </div>
   );
 }

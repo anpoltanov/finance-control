@@ -139,17 +139,20 @@ class MeView(APIView):
 class SyncView(APIView):
     def get(self, request):
         since = parse_datetime_param(request.query_params.get("since"), field="since")
+        # Take the cursor before reading. A delete that commits while the payload
+        # is built stays newer than this cursor, so the next sync still returns it.
+        synced_at = timezone.now()
 
         def active_qs(model):
             q = model.objects.filter(user=request.user, deleted_at__isnull=True)
             if since:
-                q = q.filter(updated_at__gt=since)
+                q = q.filter(updated_at__gte=since)
             return q.order_by("updated_at")
 
         def deleted_ids(model):
             q = model.objects.filter(user=request.user, deleted_at__isnull=False)
             if since:
-                q = q.filter(deleted_at__gt=since)
+                q = q.filter(deleted_at__gte=since)
             return list(q.values_list("id", flat=True))
 
         return Response(
@@ -170,7 +173,7 @@ class SyncView(APIView):
                     "budgets": deleted_ids(Budget),
                     "planned_transactions": deleted_ids(PlannedTransaction),
                 },
-                "synced_at": timezone.now().isoformat(),
+                "synced_at": synced_at.isoformat(),
             }
         )
 
